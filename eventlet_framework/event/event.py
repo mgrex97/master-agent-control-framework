@@ -47,3 +47,10 @@ class EventReplyBase(EventBase):
     def __init__(self, dst):
         super(EventReplyBase, self).__init__()
         self.dst = dst
+
+
+class EventSocketConnecting(EventBase):
+    def __init__(self, connection):
+        super(EventSocketConnecting, self).__init__()
+        self.connection = connection
+        self.address = connection.address
