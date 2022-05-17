@@ -6,14 +6,14 @@ from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_HANDSHAK
 
 
-class MCPHandler(BaseApp):
+class MCPMasterHandler(BaseApp):
     def __init__(self, *_args, **_kwargs):
-        super(MCPHandler, self).__init__(*_args, **_kwargs)
+        super(MCPMasterHandler, self).__init__(*_args, **_kwargs)
         self.name = 'mcp_handler'
         self.controller = None
 
     def start(self):
-        super(MCPHandler, self).start()
+        super(MCPMasterHandler, self).start()
         self.controller = MachineControlMasterController()
         return hub.spawn(self.controller)
 
