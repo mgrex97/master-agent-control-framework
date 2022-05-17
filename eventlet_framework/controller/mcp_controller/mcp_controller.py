@@ -38,7 +38,7 @@ from eventlet_framework.lib import hub
 from eventlet_framework.lib.hub import StreamServer
 from eventlet_framework.lib import ip
 from eventlet_framework.base.app_manager import BaseApp, lookup_service_brick
-from eventlet_framework.protocol.mcp import mcp_common, mcp_parser
+from eventlet_framework.protocol.mcp import mcp_common, mcp_parser, mcp_v_1_0 as mcproto
 
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(
@@ -121,8 +121,9 @@ class MachineConnection(object):
 
         self.unreplied_echo_requests = []
 
+        self.mcproto = mcproto
         # not finished yet
-        self.xid = random.randint(0, 65535)
+        self.xid = random.randint(0, self.mc_proto.MAX_XID)
         # self.mcp_proto.MAX_XID)
         self.id = None  # machine_id is unknown yet
         self.state = None
@@ -218,6 +219,33 @@ class MachineConnection(object):
                 if count > 2048:
                     count = 0
                     hub.sleep(0)
+
+    def send(self, buf, close_socket=False):
+        msg_enqueued = False
+        self._send_q_sem.acquire()
+        if self.send_q:
+            self.send_q.put((buf, close_socket))
+            msg_enqueued = True
+        else:
+            self._send_q_sem.release()
+        if not msg_enqueued:
+            LOG.debug('Machine Connection in process of terminating; send() to %s discarded.',
+                      self.address)
+        return msg_enqueued
+
+    def set_xid(self, msg: mcp_parser.MCPMsgBase):
+        self.xid += 1
+        self.xid &= self.mcproto.MAX_XID
+        msg.set_xid(self.xid)
+        return self.xid
+
+    def send_msg(self, msg, close_socket=False):
+        assert isinstance(msg, mcp_parser.MCPMsgBase)
+        if msg.xid is None:
+            self.set_xid(msg)
+        msg.serialize()
+        # LOG.debug('send_msg %s', msg)
+        return self.send(msg.buf, close_socket=close_socket)
 
     def serve(self):
         try:

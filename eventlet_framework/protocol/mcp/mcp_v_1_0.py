@@ -1,3 +1,5 @@
+MAX_XID = 0xffffffff
+
 # enum mcp_type
 MCP_HELLO = 0
 MCP_ERROR = 1
