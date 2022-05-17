@@ -5,8 +5,9 @@ import eventlet_framework.base.app_manager
 from eventlet_framework.controller.tshark_controller.tshark_controller import TsharkController
 
 from eventlet_framework.lib import hub
-from eventlet_framework.controller.tshark_controller import tshark_event
+from eventlet_framework.event.tshark_event import tshark_event
 from eventlet_framework.controller.handler import observe_event
+from eventlet_framework.cfg import CONF
 
 LOG = logging.getLogger(
     'eventlent_framework.controller.tshark.tshark_controller')
@@ -39,7 +40,7 @@ class RemoteTsharkHandler(eventlet_framework.base.app_manager.BaseApp):
         # self.send_event_to_observers(event, 'tshark.rstp_packet_in')
         # check_packet_delay(event.packet)
 
-    @ observe_event(tshark_event.EventTsharkPacketIn, 'tshark.packet_in')
+    @observe_event(tshark_event.EventTsharkPacketIn, 'tshark.packet_in')
     def vlan_packet_handler(self, event: tshark_event.EventTsharkPacketIn):
         if 'stp' not in event.packet:
             return

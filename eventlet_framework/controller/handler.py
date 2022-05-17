@@ -21,10 +21,6 @@ import sys
 LOG = logging.getLogger('eventlet_framework.controller.handler')
 
 # just represent OF datapath state. datapath specific so should be moved.
-HANDSHAKE_DISPATCHER = "handshake"
-CONFIG_DISPATCHER = "config"
-MAIN_DISPATCHER = "main"
-DEAD_DISPATCHER = "dead"
 
 
 class _Caller(object):
@@ -47,23 +43,6 @@ class _Caller(object):
 
 # should be named something like 'observe_event'
 def observe_event(ev_cls, ev_types=None):
-    """
-    A decorator for BaseApp application to declare an event handler.
-
-    Decorated method will become an event handler.
-    ev_cls is an event class whose instances this BaseApp wants to receive.
-    ev_types argument specifies one of the following negotiation phases
-    (or a list of them) for which events should be generated for this handler.
-    Note that, in case an event changes the phase, the phase before the change
-    is used to check the interest.
-
-    .. tabularcolumns:: |l|L|
-
-    =========================================== ===============================
-    Negotiation phase                           Description
-    =========================================== ===============================
-    =========================================== ===============================
-    """
     def _set_ev_cls_dec(handler):
         if 'callers' not in dir(handler):
             handler.callers = {}

@@ -2,7 +2,7 @@ import logging
 import time
 import os
 
-from eventlet_framework.controller import event
+from eventlet_framework.event import event
 from pyshark.packet.packet import Packet
 
 from eventlet_framework.controller import handler

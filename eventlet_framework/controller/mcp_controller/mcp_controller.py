@@ -30,19 +30,19 @@ from socket import TCP_NODELAY
 from socket import SHUT_WR
 from socket import timeout as SocketTimeout
 import ssl
-from eventlet_framework.event.tshark_event import tshark_event
+from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
+from eventlet_framework.event.mcp_event import mcp_event
 
 # from ryu import cfg
 from eventlet_framework.lib import hub
 from eventlet_framework.lib.hub import StreamServer
 from eventlet_framework.lib import ip
-from eventlet_framework.base.app_manager import lookup_service_brick
+from eventlet_framework.base.app_manager import BaseApp, lookup_service_brick
+from eventlet_framework.protocol.mcp import mcp_common, mcp_parser
 
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(
     'eventlent_framework.controller.tshark.tshark_controller')
-
-DEFAULT_BATCH_SIZE = 2 ** 16
 
 
 def _split_addr(addr):
@@ -90,23 +90,23 @@ def _deactivate(method):
     return deactivate
 
 
-class TsharkController(object):
+class MachineControlController(object):
     def __init__(self):
-        self.tshark_tcp_listen_port = 2235
-        self.tshark_listen_host = '169.254.0.111'
-        hub.spawn(self.server_loop, self.tshark_tcp_listen_port)
+        self.tcp_listen_port = 7930
+        self.listen_host = '169.254.0.111'
+        hub.spawn(self.server_loop, self.tcp_listen_port)
         self._clients = {}
 
     def __call__(self):
-        self.server_loop(self.tshark_tcp_listen_port)
+        self.server_loop(self.tcp_listen_port)
 
     def server_loop(self, tshark_tcp_listen_port):
         server = StreamServer(
-            (self.tshark_listen_host, tshark_tcp_listen_port), tshark_connection_factory)
+            (self.listen_host, tshark_tcp_listen_port), machine_connection_factory)
         server.serve_forever()
 
 
-class TsharkStreamConnection(object):
+class MachineConnection(object):
     def __init__(self, socket: socket, address):
         self.socket = socket
         self.socket.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
@@ -121,11 +121,14 @@ class TsharkStreamConnection(object):
 
         self.unreplied_echo_requests = []
 
-        self.id = None  # datapath_id is unknown yet
-        self._ports = None
-        self.state = True
-        self.tshark_brick = lookup_service_brick(
-            'tshark_event')
+        # not finished yet
+        self.xid = random.randint(0, 65535)
+        # self.mcp_proto.MAX_XID)
+        self.id = None  # machine_id is unknown yet
+        self.state = None
+        self.mcp_brick: BaseApp = lookup_service_brick(
+            'mcp_handler')
+        self.set_state(MC_HANDSHAK)
 
     def _close_write(self):
         # Note: Close only further sends in order to wait for the switch to
@@ -138,20 +141,30 @@ class TsharkStreamConnection(object):
     def close(self):
         self._close_write()
 
-    # Low level socket handling layer
+    def set_state(self, state):
+        if self.state == state:
+            return
+
+        ev = mcp_event.EventMCPStateChange(self, state, self.state)
+        # change state before send.
+        self.state = state
+
+        if self.mcp_brick != None:
+            self.mcp_brick.send_event_to_observers(ev, state)
+
     @_deactivate
     def _recv_loop(self):
-        min_read_len = remaining_read_len = DEFAULT_BATCH_SIZE
-
-        packet_count = 0
         buf = bytearray()
+        min_read_len = remaining_read_len = mcp_common.MCP_HEADER_PACK_STR
 
-        while self.state is True:
+        count = 0
+
+        while self.state != MC_DISCONNECT:
             try:
-                # read_len = min_read_len
-                # if remaining_read_len > min_read_len:
-                # read_len = remaining_read_len
-                ret = self.socket.recv(min_read_len)
+                read_len = min_read_len
+                if remaining_read_len > min_read_len:
+                    read_len = remaining_read_len
+                ret = self.socket.recv(read_len)
             except SocketTimeout:
                 continue
             except ssl.SSLError:
@@ -165,29 +178,46 @@ class TsharkStreamConnection(object):
                 break
 
             buf += ret
+            buf_len = len(buf)
 
-            packet, buf = tshark_event.extract_packet_json_from_data(
-                buf, got_first_packet=packet_count > 0)
+            while buf_len >= min_read_len:
+                (machine_id, msg_type, msg_len, xid) = mcp_parser.header(buf)
+                if msg_len < min_read_len:
+                    # Someone isn't playing nicely; log it, and try something sane.
+                    LOG.debug("Message with invalid length %s received from Machine at address %s",
+                              msg_len, self.address)
+                    msg_len = min_read_len
+                if buf_len < msg_len:
+                    remaining_read_len = (msg_len - buf_len)
+                    break
 
-            if packet is None:
-                continue
+                msg = mcp_parser.msg(
+                    self, msg_type, msg_len, xid, buf[:msg_len])
 
-            # tshark_packet_in
-            ev_type = 'tshark.packet_in'
-            ev = tshark_event.tshark_packet_to_ev_cls(packet, self.address)
+                if msg:
+                    # decode event and create event
+                    ev = mcp_event.mcp_msg_to_ev(msg)
+                    if self.mcp_brick is not None:
+                        self.mcp_brick.send_event_to_observers(ev, self.state)
 
-            if self.tshark_brick is not None:
-                self.tshark_brick.send_event_to_observers(ev, ev_type)
+                        def ev_types(x):
+                            return x.callers[ev.__class__].ev_types
 
-                def ev_types(x):
-                    return x.callers[ev.__class__].ev_types
+                        handlers = [handler for handler in
+                                    self.mcp_brick.get_handlers(ev) if
+                                    self.state in ev_types(handler)]
 
-                handlers = [handler for handler in
-                            self.tshark_brick.get_handlers(ev) if
-                            ev_type in ev_types(handler)]
+                        for handler in handlers:
+                            handler(ev)
 
-                for handler in handlers:
-                    handler(ev)
+                buf = buf[msg_len:]
+                buf_len = len(buf)
+                remaining_read_len = min_read_len
+
+                count += 1
+                if count > 2048:
+                    count = 0
+                    hub.sleep(0)
 
     def serve(self):
         try:
@@ -197,12 +227,12 @@ class TsharkStreamConnection(object):
             self.is_active = False
 
 
-def tshark_connection_factory(socket: socket, address):
+def machine_connection_factory(socket: socket, address):
     LOG.debug('connected socket:%s address:%s port:%s',
               socket, *socket.getpeername())
-    with contextlib.closing(TsharkStreamConnection(socket, address)) as tshark_client_socket:
+    with contextlib.closing(MachineConnection(socket, address)) as machine_connection:
         try:
-            tshark_client_socket.serve()
+            machine_connection.serve()
         except Exception as e:
             # Something went wrong.
             # Especially malicious switch can send malformed packet,

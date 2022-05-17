@@ -4,8 +4,8 @@ import logging
 import gc
 
 from eventlet_framework.controller.handler import register_instance, get_dependent_services
-from eventlet_framework.controller import event
-from eventlet_framework.controller.event import EventReplyBase, EventRequestBase
+from eventlet_framework.event import event
+from eventlet_framework.event.event import EventReplyBase, EventRequestBase
 from eventlet_framework.lib import hub
 from eventlet_framework import utils
 
