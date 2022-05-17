@@ -1,6 +1,6 @@
 from eventlet_framework.controller.handler import observe_event
 from eventlet_framework.base.app_manager import BaseApp
-from eventlet_framework.controller.mcp_controller.mcp_controller import MachineControlController
+from eventlet_framework.controller.mcp_controller.mcp_controller import MachineControlMasterController
 from eventlet_framework.lib import hub
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_HANDSHAK
@@ -14,7 +14,7 @@ class MCPHandler(BaseApp):
 
     def start(self):
         super(MCPHandler, self).start()
-        self.controller = MachineControlController()
+        self.controller = MachineControlMasterController()
         return hub.spawn(self.controller)
 
     @observe_event(mcp_event.EventMCPHello, MC_HANDSHAK)
