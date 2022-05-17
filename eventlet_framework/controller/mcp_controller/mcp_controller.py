@@ -220,6 +220,36 @@ class MachineConnection(object):
                     count = 0
                     hub.sleep(0)
 
+    def _send_loop(self):
+        try:
+            while self.state != MC_DISCONNECT:
+                buf, close_socket = self.send_q.get()
+                self._send_q_sem.release()
+                self.socket.sendall(buf)
+                if close_socket:
+                    break
+        except SocketTimeout:
+            LOG.debug("Socket timed out while sending data to switch at address %s",
+                      self.address)
+        except IOError as ioe:
+            # Convert ioe.errno to a string, just in case it was somehow set to None.
+            errno = "%s" % ioe.errno
+            LOG.debug("Socket error while sending data to switch at address %s: [%s] %s",
+                      self.address, errno, ioe.strerror)
+        finally:
+            q = self.send_q
+            # First, clear self.send_q to prevent new references.
+            self.send_q = None
+            # Now, drain the send_q, releasing the associated semaphore for each entry.
+            # This should release all threads waiting to acquire the semaphore.
+            try:
+                while q.get(block=False):
+                    self._send_q_sem.release()
+            except hub.QueueEmpty:
+                pass
+            # Finally, disallow further sends.
+            self._close_write()
+
     def send(self, buf, close_socket=False):
         msg_enqueued = False
         self._send_q_sem.acquire()
