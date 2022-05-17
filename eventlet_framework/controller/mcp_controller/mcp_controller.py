@@ -90,7 +90,7 @@ def _deactivate(method):
     return deactivate
 
 
-class MachineControlController(object):
+class MachineControlMasterController(object):
     def __init__(self):
         self.tcp_listen_port = 7930
         self.listen_host = '169.254.0.111'
