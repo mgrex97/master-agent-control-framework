@@ -38,7 +38,7 @@ from eventlet_framework.lib import hub
 from eventlet_framework.lib.hub import StreamServer
 from eventlet_framework.lib import ip
 from eventlet_framework.base.app_manager import BaseApp, lookup_service_brick
-from eventlet_framework.protocol.mcp import mcp_common, mcp_parser, mcp_v_1_0 as mcproto
+from eventlet_framework.protocol.mcp import mcp_common, mcp_parser, mcp_v_1_0 as mcproto, mcp_parser_v_1_0 as mcproto_parser
 
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(
@@ -121,9 +121,10 @@ class MachineConnection(object):
 
         self.unreplied_echo_requests = []
 
+        self.mcproto_parser = mcproto_parser
         self.mcproto = mcproto
         # not finished yet
-        self.xid = random.randint(0, self.mc_proto.MAX_XID)
+        self.xid = random.randint(0, self.mcproto.MAX_XID)
         # self.mcp_proto.MAX_XID)
         self.id = None  # machine_id is unknown yet
         self.state = None
@@ -182,7 +183,7 @@ class MachineConnection(object):
             buf_len = len(buf)
 
             while buf_len >= min_read_len:
-                (machine_id, msg_type, msg_len, xid) = mcp_parser.header(buf)
+                (machine_id, msg_type, msg_len, xid) = mcproto_parser.header(buf)
                 if msg_len < min_read_len:
                     # Someone isn't playing nicely; log it, and try something sane.
                     LOG.debug("Message with invalid length %s received from Machine at address %s",
@@ -192,21 +193,16 @@ class MachineConnection(object):
                     remaining_read_len = (msg_len - buf_len)
                     break
 
-                msg = mcp_parser.msg(
+                msg = mcproto_parser.msg(
                     self, msg_type, msg_len, xid, buf[:msg_len])
 
                 if msg:
                     # decode event and create event
                     ev = mcp_event.mcp_msg_to_ev(msg)
                     if self.mcp_brick is not None:
+                        # send event to observers and self event handlers
                         self.mcp_brick.send_event_to_observers(ev, self.state)
-
-                        def ev_types(x):
-                            return x.callers[ev.__class__].ev_types
-
-                        handlers = [handler for handler in
-                                    self.mcp_brick.get_handlers(ev) if
-                                    self.state in ev_types(handler)]
+                        handlers = self.mcp_brick.get_handlers(ev, self.state)
 
                         for handler in handlers:
                             handler(ev)
@@ -263,14 +259,14 @@ class MachineConnection(object):
                       self.address)
         return msg_enqueued
 
-    def set_xid(self, msg: mcp_parser.MCPMsgBase):
+    def set_xid(self, msg: mcproto_parser.MCPMsgBase):
         self.xid += 1
         self.xid &= self.mcproto.MAX_XID
         msg.set_xid(self.xid)
         return self.xid
 
     def send_msg(self, msg, close_socket=False):
-        assert isinstance(msg, mcp_parser.MCPMsgBase)
+        assert isinstance(msg, self.mcproto_parser.MCPMsgBase)
         if msg.xid is None:
             self.set_xid(msg)
         msg.serialize()
