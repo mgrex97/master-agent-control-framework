@@ -51,9 +51,10 @@ def msg(machine, msg_type, msg_len, xid, buf):
 
     try:
         msg = msg_parser(machine, msg_type, msg_len, xid, buf)
-    except:
+    except Exception as e:
         LOG.exception(
             'Encountered an error while parsing MachineControl packet from test device.')
+        exp = e
 
     if exp:
         raise exp
