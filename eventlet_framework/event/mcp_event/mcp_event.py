@@ -8,7 +8,7 @@ from eventlet_framework.protocol.mcp import mcp_parser_v_1_0
 class EventMCPMsgBase(event.EventBase):
     def __init__(self, msg):
         self.timestamp = time.time()
-        super().__init__(self, msg)
+        super().__init__()
         self.msg = msg
 
 
