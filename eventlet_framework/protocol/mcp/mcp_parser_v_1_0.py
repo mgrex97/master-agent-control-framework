@@ -1,4 +1,3 @@
-
 from eventlet_framework.protocol.mcp import mcp_v_1_0 as mcproto
 from eventlet_framework.protocol.mcp import mcp_parser
 import logging
@@ -28,9 +27,9 @@ def _register_parser(cls):
 
 
 @mcp_parser.register_msg_parser()
-def msg_parser(machine, machine_id, msg_type, msg_len, xid, buf):
+def msg_parser(machine, msg_type, msg_len, xid, buf):
     parser = _MSG_PARSERS.get(msg_type)
-    return parser(machine, machine_id, msg_type, msg_len, xid, buf)
+    return parser(machine, msg_type, msg_len, xid, buf)
 
 
 def _set_msg_reply(msg_reply):
