@@ -91,22 +91,6 @@ def _deactivate(method):
     return deactivate
 
 
-class MachineControlMasterController(object):
-    def __init__(self):
-        self.tcp_listen_port = 7930
-        self.listen_host = '169.254.0.111'
-        hub.spawn(self.server_loop, self.tcp_listen_port)
-        self._clients = {}
-
-    def __call__(self):
-        self.server_loop(self.tcp_listen_port)
-
-    def server_loop(self, tshark_tcp_listen_port):
-        server = StreamServer(
-            (self.listen_host, tshark_tcp_listen_port), machine_connection_factory)
-        server.serve_forever()
-
-
 class MachineConnection(object):
     def __init__(self, socket: socket, address, mcp_brick_name):
         self.socket = socket
@@ -294,25 +278,3 @@ class MachineConnection(object):
             hub.kill(send_thr)
             hub.joinall([send_thr])
             self.is_active = False
-
-
-def machine_connection_factory(socket: socket, address):
-    LOG.debug('connected socket:%s address:%s port:%s',
-              socket, *socket.getpeername())
-    with contextlib.closing(MachineConnection(socket, address)) as machine_connection:
-        try:
-            machine_connection.serve()
-        except Exception as e:
-            # Something went wrong.
-            # Especially malicious switch can send malformed packet,
-            # the parser raise exception.
-            # Can we do anything more graceful?
-            print(e)
-            """
-            if datapath.id is None:
-                dpid_str = "%s" % datapath.id
-            else:
-                dpid_str = dpid_to_str(datapath.id)
-            LOG.error("Error in the datapath %s from %s", dpid_str, address)
-            raise
-            """
