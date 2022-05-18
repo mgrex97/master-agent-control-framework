@@ -32,6 +32,7 @@ from socket import timeout as SocketTimeout
 import ssl
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
 from eventlet_framework.event.mcp_event import mcp_event
+from eventlet_framework.event import event
 
 # from ryu import cfg
 from eventlet_framework.lib import hub
@@ -274,10 +275,24 @@ class MachineConnection(object):
         return self.send(msg.buf, close_socket=close_socket)
 
     def serve(self):
+        send_thr = hub.spawn(self._send_loop)
+
+        # send connection event
+        connect_ev = event.EventSocketConnecting(self)
+
+        # send socket connecting event
+        self.mcp_brick.send_event_to_observers(connect_ev)
+        handlers = self.mcp_brick.get_handlers(
+            connect_ev, MC_HANDSHAK)
+
+        for handler in handlers:
+            handler(connect_ev)
+
         try:
             self._recv_loop()
         finally:
-            # hub.joinall([green_thr])
+            hub.kill(send_thr)
+            hub.joinall([send_thr])
             self.is_active = False
 
 
