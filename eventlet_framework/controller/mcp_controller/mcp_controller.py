@@ -108,7 +108,7 @@ class MachineControlMasterController(object):
 
 
 class MachineConnection(object):
-    def __init__(self, socket: socket, address):
+    def __init__(self, socket: socket, address, mcp_brick_name):
         self.socket = socket
         self.socket.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
         self.socket.settimeout(10.0)
@@ -130,7 +130,7 @@ class MachineConnection(object):
         self.id = None  # machine_id is unknown yet
         self.state = None
         self.mcp_brick: BaseApp = lookup_service_brick(
-            'mcp_handler')
+            mcp_brick_name)
         self.set_state(MC_HANDSHAK)
 
     def _close_write(self):
