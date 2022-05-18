@@ -103,6 +103,7 @@ class MCPMsgBase(object):
 
     def _serialize_pre(self):
         self.msg_type = self.cls_msg_type
+        self.machine_id = self.machine.id
         # should import from self.machine.mcpproto.OFP_HEADER_SZIE
         self.buf = bytearray(MCP_HEADER_SIZE)
 
