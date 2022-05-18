@@ -158,7 +158,7 @@ class MachineConnection(object):
     @_deactivate
     def _recv_loop(self):
         buf = bytearray()
-        min_read_len = remaining_read_len = mcp_common.MCP_HEADER_PACK_STR
+        min_read_len = remaining_read_len = mcp_common.MCP_HEADER_SIZE
 
         count = 0
 
@@ -184,7 +184,7 @@ class MachineConnection(object):
             buf_len = len(buf)
 
             while buf_len >= min_read_len:
-                (machine_id, msg_type, msg_len, xid) = mcproto_parser.header(buf)
+                (machine_id, msg_type, msg_len, xid) = mcp_parser.header(buf)
                 if msg_len < min_read_len:
                     # Someone isn't playing nicely; log it, and try something sane.
                     LOG.debug("Message with invalid length %s received from Machine at address %s",
@@ -194,7 +194,7 @@ class MachineConnection(object):
                     remaining_read_len = (msg_len - buf_len)
                     break
 
-                msg = mcproto_parser.msg(
+                msg = mcp_parser.msg(
                     self, msg_type, msg_len, xid, buf[:msg_len])
 
                 if msg:
