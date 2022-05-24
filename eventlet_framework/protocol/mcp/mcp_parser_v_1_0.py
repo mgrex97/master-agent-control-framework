@@ -13,11 +13,19 @@ _MSG_PARSERS = {}
 
 
 def _set_msg_type(msg_type):
-    '''Annotate corresponding OFP message type'''
+    '''Annotate corresponding MCP message type'''
     def _set_cls_msg_type(cls):
         cls.cls_msg_type = msg_type
         return cls
     return _set_cls_msg_type
+
+
+def _set_msg_reply(msg_reply):
+    '''Annotate MCP reply message class'''
+    def _set_cls_msg_reply(cls):
+        cls.cls_msg_reply = msg_reply
+        return cls
+    return _set_cls_msg_reply
 
 
 def _register_parser(cls):
