@@ -51,9 +51,9 @@ class MCPHello(MCPMsgBase):
 @_register_parser
 @_set_msg_type(mcproto.MCP_EXECUTE_COMMAND_REQUEST)
 class MCPExecuteCommandRequest(MCPMsgBase):
-    def __init__(self, mcp_connection, job_id=None, command=None):
+    def __init__(self, mcp_connection, timeout=0, command=None):
         super().__init__(mcp_connection)
-        self.job_id = job_id
+        self.timeout = timeout
         self.command = command
 
     @classmethod
@@ -61,13 +61,10 @@ class MCPExecuteCommandRequest(MCPMsgBase):
         msg = super(MCPExecuteCommandRequest, cls).parser(
             mcp_connection, msg_type, msg_len, xid, buf)
 
-        (msg.job_id,
-         msg.cmd_len) = struct.unpack_from(
-            mcproto.MCP_EXECUTE_COMMAND_REQUEST_STR,
-            msg.buf, mcproto.MCP_HEADER_SIZE
-        )
+        (msg.timeout, msg.cmd_len) = struct.unpack_from(
+            mcproto.MCP_EXE_CMD_REQUEST_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
 
-        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_EXECUTE_COMMAND_REQUEST_SIZE
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_EXE_CMD_REQUEST_SIZE
 
         msg.cmd_bytes = msg.buf[offset:]
         if msg.cmd_len < len(msg.cmd_bytes):
@@ -84,11 +81,11 @@ class MCPExecuteCommandRequest(MCPMsgBase):
         return super().serialize()
 
     def _serialize_body(self):
-        assert self.job_id is not None
+        assert self.timeout is not None
         assert self.cmd_len is not None
         assert self.cmd_bytes is not None
 
-        msg_pack_into(mcproto.MCP_EXECUTE_COMMAND_REQUEST_STR,
-                      self.buf, mcproto.MCP_HEADER_SIZE, self.job_id, self.cmd_len)
+        msg_pack_into(mcproto.MCP_EXE_CMD_REQUEST_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.timeout, self.cmd_len)
 
         self.buf.extend(self.cmd_bytes)
