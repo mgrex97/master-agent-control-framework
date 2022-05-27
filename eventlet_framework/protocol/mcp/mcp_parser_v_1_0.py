@@ -42,13 +42,6 @@ def msg_parser(machine, msg_type, msg_len, xid, buf):
     return parser(machine, msg_type, msg_len, xid, buf)
 
 
-def _set_msg_reply(msg_reply):
-    def _set_cls_msg_reply(cls):
-        cls.cls_msg_reply = msg_reply
-        return cls
-    return _set_cls_msg_reply
-
-
 @_register_parser
 @_set_msg_type(mcproto.MCP_HELLO)
 class MCPHello(MCPMsgBase):
@@ -57,43 +50,187 @@ class MCPHello(MCPMsgBase):
 
 
 @_register_parser
-@_set_msg_type(mcproto.MCP_EXECUTE_COMMAND_REQUEST)
-class MCPExecuteCommandRequest(MCPMsgBase):
-    def __init__(self, mcp_connection, timeout=0, command=None):
+@_set_msg_type(mcproto.MCP_JOB_CREATE_REPLY)
+class MCPJobCreateReply(MCPMsgBase):
+    def __init__(self, mcp_connection, job_id=None, job_info=None):
         super().__init__(mcp_connection)
-        self.timeout = timeout
-        self.command = command
+        self.job_id = job_id
+        self.job_info = job_info
 
     @classmethod
     def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
-        msg = super(MCPExecuteCommandRequest, cls).parser(
+        msg = super(MCPJobCreateReply, cls).parser(
             mcp_connection, msg_type, msg_len, xid, buf)
 
-        (msg.timeout, msg.cmd_len) = struct.unpack_from(
-            mcproto.MCP_EXE_CMD_REQUEST_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+        (msg.job_id, msg.job_info_len) = struct.unpack_from(
+            mcproto.MCP_JOB_CREATE_REPLY_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
 
-        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_EXE_CMD_REQUEST_SIZE
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_JOB_CREATE_REPLY_SIZE
 
-        msg.cmd_bytes = msg.buf[offset:]
-        if msg.cmd_len < len(msg.cmd_bytes):
-            msg.cmd_bytes = msg.cmd_bytes[:msg.cmd_len]
+        msg.job_info_bytes = msg.buf[offset:]
+        if msg.job_info_len < len(msg.job_info_bytes):
+            msg.job_info_bytes = msg.job_info_bytes[:msg.job_info_len]
 
-        msg.command = msg.cmd_bytes.decode(encoding='utf-8')
+        msg.job_info = msg.job_info_bytes.decode(encoding='utf-8')
 
         return msg
 
     def serialize(self):
-        self.cmd_bytes = self.command.encode('utf-8')
-        self.cmd_len = len(self.cmd_bytes)
+        self.job_info_bytes = self.job_info.encode('utf-8')
+        self.job_info_len = len(self.job_info_bytes)
+
+        return super().serialize()
+
+    def _serialize_body(self):
+        assert self.job_id is not None
+        assert self.job_info_bytes is not None
+        assert self.job_info_len is not None
+
+        msg_pack_into(mcproto.MCP_JOB_CREATE_REPLY_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.job_id, self.job_info_len)
+
+        self.buf.extend(self.job_info_bytes)
+
+
+@_set_msg_reply(MCPJobCreateReply)
+@_register_parser
+@_set_msg_type(mcproto.MCP_JOB_CREATE_REQUEST)
+class MCPJobCreateRequest(MCPMsgBase):
+    _JOB_TYPES = {}
+
+    def __init__(self, mcp_connection, timeout=0, job_info=None):
+        super().__init__(mcp_connection)
+        self.timeout = timeout
+        self.job_info = job_info
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+        msg = super(MCPJobCreateRequest, cls).parser(
+            mcp_connection, msg_type, msg_len, xid, buf)
+
+        (msg.timeout, msg.job_info_len) = struct.unpack_from(
+            mcproto.MCP_JOB_CREATE_REQUEST_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_JOB_CREATE_REQUEST_SIZE
+
+        msg.job_info_bytes = msg.buf[offset:]
+        if msg.job_info_len < len(msg.job_info_bytes):
+            msg.job_info_bytes = msg.job_info_bytes[:msg.job_info_len]
+
+        msg.job_info = msg.job_info_bytes.decode(encoding='utf-8')
+
+        return msg
+
+    def serialize(self):
+        self.job_info_bytes = self.job_info.encode('utf-8')
+        self.job_info_len = len(self.job_info_bytes)
 
         return super().serialize()
 
     def _serialize_body(self):
         assert self.timeout is not None
-        assert self.cmd_len is not None
-        assert self.cmd_bytes is not None
+        assert self.job_info_len is not None
+        assert self.job_info_bytes is not None
 
-        msg_pack_into(mcproto.MCP_EXE_CMD_REQUEST_STR,
-                      self.buf, mcproto.MCP_HEADER_SIZE, self.timeout, self.cmd_len)
+        msg_pack_into(mcproto.MCP_JOB_CREATE_REQUEST_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.timeout, self.job_info_len)
 
-        self.buf.extend(self.cmd_bytes)
+        self.buf.extend(self.job_info_bytes)
+
+
+@_register_parser
+@_set_msg_type(mcproto.MCP_JOB_ACK)
+class MCPJobACK(MCPMsgBase):
+    def __init__(self, mcp_connection, job_id=None):
+        super().__init__(mcp_connection)
+        self.job_id = job_id
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+        msg = super(MCPJobACK, cls).parser(
+            mcp_connection, msg_type, msg_len, xid, buf)
+
+        (msg.job_id) = struct.unpack_from(
+            mcproto.MCP_JOB_ACK_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.job_id is not None
+
+        msg_pack_into(mcproto.MCP_JOB_ACK_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.job_id)
+
+
+@_register_parser
+@_set_msg_type(mcproto.MCP_JOB_STATE_INFORM)
+class MCPJobStateInform(MCPMsgBase):
+    def __init__(self, mcp_connection, job_id=None, information=None):
+        super().__init__(mcp_connection)
+        self.job_id = job_id
+        self.information = information
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+        msg = super(MCPJobStateInform, cls).parser(
+            mcp_connection, msg_type, msg_len, xid, buf)
+
+        (msg.job_id) = struct.unpack_from(
+            mcproto.MCP_JOB_STATE_INFORM_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.job_id is not None
+
+        msg_pack_into(mcproto.MCP_JOB_STATE_INFORM_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.job_id)
+
+
+@_register_parser
+@_set_msg_type(mcproto.MCP_JOB_DELETE_REPLY)
+class MCPJobDeleteReply(MCPMsgBase):
+    def __init__(self, mcp_connection, job_id):
+        super().__init__(mcp_connection)
+        self.job_id = job_id
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+        msg = super(MCPJobDeleteReply, cls).parser(
+            mcp_connection, msg_type, msg_len, xid, buf)
+
+        (msg.job_id) = struct.unpack_from(
+            mcproto.MCP_JOB_DELETE_REPLY_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.job_id is not None
+
+        msg_pack_into(mcproto.MCP_JOB_DELETE_REPLY_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.job_id)
+
+
+@_set_msg_reply(MCPJobDeleteReply)
+@_register_parser
+@_set_msg_type(mcproto.MCP_JOB_DELETE_REQUEST)
+class MCPJobDeleteRequest(MCPMsgBase):
+    def __init__(self, mcp_connection, job_id):
+        super().__init__(mcp_connection)
+        self.job_id = job_id
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+        msg = super(MCPJobDeleteRequest, cls).parser(
+            mcp_connection, msg_type, msg_len, xid, buf)
+
+        (msg.job_id) = struct.unpack_from(
+            mcproto.MCP_JOB_DELETE_REQUEST_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.job_id is not None
+
+        msg_pack_into(mcproto.MCP_JOB_DELETE_REQUEST_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.job_id)
