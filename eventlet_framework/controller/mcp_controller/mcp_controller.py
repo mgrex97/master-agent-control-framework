@@ -111,7 +111,7 @@ class MachineConnection(object):
         # not finished yet
         self.xid = random.randint(0, self.mcproto.MAX_XID)
         # self.mcp_proto.MAX_XID)
-        self.id = None  # machine_id is unknown yet
+        self.id = 0  # machine_id is unknown yet
         self.state = None
         self.mcp_brick: BaseApp = lookup_service_brick(
             mcp_brick_name)
