@@ -138,6 +138,10 @@ class MachineConnection(object):
 
         if self.mcp_brick != None:
             self.mcp_brick.send_event_to_observers(ev, state)
+            handlers = self.mcp_brick.get_handlers(ev, state)
+
+            for handler in handlers:
+                handler(ev)
 
     @_deactivate
     def _recv_loop(self):
