@@ -66,9 +66,7 @@ class MCPHello(MCPMsgBase):
                       self.buf, mcproto.MCP_HEADER_SIZE, self.connection_id)
 
 
-@_register_parser
-@_set_msg_type(mcproto.MCP_JOB_CREATE_REPLY)
-class MCPJobCreateReply(MCPMsgBase):
+class MCPJobIDWithInfo(MCPMsgBase):
     def __init__(self, mcp_connection, job_id=None, job_info=None):
         super().__init__(mcp_connection)
         self.job_id = job_id
@@ -76,13 +74,13 @@ class MCPJobCreateReply(MCPMsgBase):
 
     @classmethod
     def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
-        msg = super(MCPJobCreateReply, cls).parser(
+        msg = super(MCPJobIDWithInfo, cls).parser(
             mcp_connection, msg_type, msg_len, xid, buf)
 
         (msg.job_id, msg.job_info_len) = struct.unpack_from(
-            mcproto.MCP_JOB_CREATE_REPLY_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+            mcproto.MCP_JOB_ID_WITH_INFO_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
 
-        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_JOB_CREATE_REPLY_SIZE
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_JOB_ID_WITH_INFO_SIZE
 
         msg.job_info_bytes = msg.buf[offset:]
         if msg.job_info_len < len(msg.job_info_bytes):
@@ -103,10 +101,16 @@ class MCPJobCreateReply(MCPMsgBase):
         assert self.job_info_bytes is not None
         assert self.job_info_len is not None
 
-        msg_pack_into(mcproto.MCP_JOB_CREATE_REPLY_STR,
+        msg_pack_into(mcproto.MCP_JOB_ID_WITH_INFO_STR,
                       self.buf, mcproto.MCP_HEADER_SIZE, self.job_id, self.job_info_len)
 
         self.buf.extend(self.job_info_bytes)
+
+
+@_register_parser
+@_set_msg_type(mcproto.MCP_JOB_CREATE_REPLY)
+class MCPJobCreateReply(MCPJobIDWithInfo):
+    pass
 
 
 @_set_msg_reply(MCPJobCreateReply)
