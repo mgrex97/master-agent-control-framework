@@ -84,3 +84,5 @@ def machine_connection_factory(socket: socket, address):
             LOG.error("Error in the datapath %s from %s", dpid_str, address)
             raise
             """
+        finally:
+            machine_connection.set_state(MC_DISCONNECT)
