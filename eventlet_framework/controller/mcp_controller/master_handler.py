@@ -1,10 +1,14 @@
-from eventlet_framework.controller.handler import observe_event
+import logging
+from eventlet_framework.controller.handler import observe_event, observe_event_with_specific_src
 from eventlet_framework.base.app_manager import BaseApp
 from eventlet_framework.controller.mcp_controller.master_controller import MachineControlMasterController
 from eventlet_framework.lib import hub
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.event import event
-from eventlet_framework.controller.mcp_controller.mcp_state import MC_HANDSHAK
+from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_FEATURE, MC_HANDSHAK, MC_STABLE
+
+LOG = logging.getLogger(
+    'eventlent_framework.controller.mcp_controller.agent_controller')
 
 
 class MCPMasterHandler(BaseApp):
