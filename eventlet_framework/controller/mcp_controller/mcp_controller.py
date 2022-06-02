@@ -171,7 +171,7 @@ class MachineConnection(object):
             buf_len = len(buf)
 
             while buf_len >= min_read_len:
-                (machine_id, msg_type, msg_len, xid) = mcp_parser.header(buf)
+                (msg_type, msg_len, xid) = mcp_parser.header(buf)
                 if msg_len < min_read_len:
                     # Someone isn't playing nicely; log it, and try something sane.
                     LOG.debug("Message with invalid length %s received from Machine at address %s",

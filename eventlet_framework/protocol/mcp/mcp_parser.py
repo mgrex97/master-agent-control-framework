@@ -2,7 +2,6 @@ import collections
 import struct
 import base64
 import logging
-from dataclasses import dataclass
 
 from eventlet_framework.lib import stringify
 from eventlet_framework.protocol.mcp.mcp_common import MCP_HEADER_PACK_STR, MCP_HEADER_SIZE
@@ -39,7 +38,7 @@ def register_msg_parser(keyword='not implement'):
 _MSG_PARSERS = {}
 
 
-def msg(machine, msg_type, msg_len, xid, buf):
+def msg(connection, msg_type, msg_len, xid, buf):
     exp = None
 
     try:
@@ -50,7 +49,7 @@ def msg(machine, msg_type, msg_len, xid, buf):
     msg_parser = _MSG_PARSERS.get('not implement')
 
     try:
-        msg = msg_parser(machine, msg_type, msg_len, xid, buf)
+        msg = msg_parser(connection, msg_type, msg_len, xid, buf)
     except Exception as e:
         LOG.exception(
             'Encountered an error while parsing MachineControl packet from test device.')
@@ -72,9 +71,8 @@ class StringifyMixin(stringify.StringifyMixin):
 
 
 class MCPMsgBase(object):
-    def __init__(self, machine):
-        self.machine = machine
-        self.machine_id = None
+    def __init__(self, connection):
+        self.connection = connection
         self.msg_type = None
         self.msg_len = None
         self.xid = None
@@ -83,7 +81,6 @@ class MCPMsgBase(object):
     def set_headers(self, msg_type, msg_len, xid):
         assert msg_type == self.cls_msg_type
 
-        self.machine_id = self.machine.id
         self.msg_type = msg_type
         self.msg_len = msg_len
         self.xid = xid
@@ -95,8 +92,8 @@ class MCPMsgBase(object):
         self.buf = bytes(buf)
 
     @classmethod
-    def parser(cls, machine, msg_type, msg_len, xid, buf):
-        msg_ = cls(machine)
+    def parser(cls, connection, msg_type, msg_len, xid, buf):
+        msg_ = cls(connection)
         msg_.set_headers(msg_type, msg_len,
                          xid)
         msg_.set_buf(buf)
@@ -104,14 +101,10 @@ class MCPMsgBase(object):
 
     def _serialize_pre(self):
         self.msg_type = self.cls_msg_type
-        self.machine_id = self.machine.id
-        # should import from self.machine.mcpproto.OFP_HEADER_SZIE
         self.buf = bytearray(MCP_HEADER_SIZE)
 
     def _serialize_header(self):
         # buffer length is determined after trailing data is formated.
-        assert self.machine_id is not None
-        assert self.machine_id == self.machine.id
         assert self.msg_type is not None
         assert self.buf is not None
         assert len(self.buf) >= MCP_HEADER_SIZE
@@ -122,7 +115,7 @@ class MCPMsgBase(object):
 
         struct.pack_into(MCP_HEADER_PACK_STR,
                          self.buf, 0,
-                         self.machine_id, self.msg_type, self.msg_len, self.xid)
+                         self.msg_type, self.msg_len, self.xid)
 
     def _serialize_body(self):
         pass

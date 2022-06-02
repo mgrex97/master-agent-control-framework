@@ -37,16 +37,33 @@ def _register_parser(cls):
 
 
 @mcp_parser.register_msg_parser()
-def msg_parser(machine, msg_type, msg_len, xid, buf):
+def msg_parser(connection, msg_type, msg_len, xid, buf):
     parser = _MSG_PARSERS.get(msg_type)
-    return parser(machine, msg_type, msg_len, xid, buf)
+    return parser(connection, msg_type, msg_len, xid, buf)
 
 
 @_register_parser
 @_set_msg_type(mcproto.MCP_HELLO)
 class MCPHello(MCPMsgBase):
-    def __init__(self, mcp_connection):
+    def __init__(self, mcp_connection, connection_id=None):
         super().__init__(mcp_connection)
+        self.connection_id = connection_id
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+        msg = super(MCPHello, cls).parser(
+            mcp_connection, msg_type, msg_len, xid, buf)
+
+        (msg.connection_id, ) = struct.unpack_from(
+            mcproto.MCP_HELLO_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.connection_id is not None
+
+        msg_pack_into(mcproto.MCP_HELLO_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.connection_id)
 
 
 @_register_parser
