@@ -209,6 +209,12 @@ class MCPJobStateInform(MCPMsgBase):
 
 
 @_register_parser
+@_set_msg_type(mcproto.MCP_JOB_RUNNING_OUTPUT)
+class MCPJobOutput(MCPJobIDWithInfo):
+    pass
+
+
+@_register_parser
 @_set_msg_type(mcproto.MCP_JOB_DELETE_REPLY)
 class MCPJobDeleteReply(MCPMsgBase):
     def __init__(self, mcp_connection, job_id):
