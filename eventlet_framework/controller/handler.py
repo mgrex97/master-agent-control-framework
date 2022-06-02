@@ -52,6 +52,20 @@ def observe_event(ev_cls, ev_types=None):
     return _set_ev_cls_dec
 
 
+def observe_event_with_specific_src(ev_cls_with_src, ev_types=None):
+    def _set_ev_cls_dec(handler):
+        if 'callers' not in dir(handler):
+            handler.callers = {}
+
+        for _, data in enumerate(_listify(ev_cls_with_src)):
+            e = data[0]
+            src_module = data[1]
+
+            handler.callers[e] = _Caller(_listify(ev_types), src_module)
+        return handler
+    return _set_ev_cls_dec
+
+
 def observe_event_without_event_source(ev_cls, ev_types=None):
     def _set_ev_cls_dec(handler):
         if 'callers' not in dir(handler):
