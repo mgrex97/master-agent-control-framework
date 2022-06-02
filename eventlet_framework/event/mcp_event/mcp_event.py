@@ -61,8 +61,8 @@ for mcp_mods in mcproto.get_ofp_modules().values():
 
 
 class EventMCPStateChange(event.EventBase):
-    def __init__(self, machine, state, previous_state=None):
+    def __init__(self, connection, state, previous_state=None):
         super(EventMCPStateChange, self).__init__()
-        self.machine = machine
+        self.connection = connection
         self.state = state
         self.previous_state = previous_state
