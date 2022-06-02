@@ -111,17 +111,20 @@ class JobCommand(Job):
         hub.spawn(self.__read_output_from_green_io, self.stderr)
 
     def __read_output_from_green_io(self, greenpipe):
-        output = b''
         while True:
             get = greenpipe.readline()
-            # print(get.decode(encoding='utf-8'))
-            output = output + get
-            # send back to master, not implement yet.
 
             if self.__process.poll() is not None and len(get) == 0:
                 break
 
             hub.sleep(0)
+
+            output_info = super(JobCommand, self).job_info_serialize()
+            output_info['output'] = get.decode(encoding='utf-8')
+
+            output_msg = self.connection.mcproto_parser.MCPJobOutput(
+                self.connection, self.id, json.dumps(output_info))
+            self.connection.send_msg(output_msg)
 
     def __get_stderr(self):
         pass
