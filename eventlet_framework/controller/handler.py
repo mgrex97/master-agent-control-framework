@@ -52,8 +52,22 @@ def observe_event(ev_cls, ev_types=None):
     return _set_ev_cls_dec
 
 
+def observe_event_from_self(ev_cls, ev_types):
+    def _observe_event_from_self(handler):
+        frame = inspect.currentframe()
+        assert frame is not None
+        m_name = frame.f_back.f_globals['__name__']
+
+        if 'callers' not in dir(handler):
+            handler.callers = {}
+        for e in _listify(ev_cls):
+            handler.callers[e] = _Caller(_listify(ev_types), m_name)
+        return handler
+    return _observe_event_from_self
+
+
 def observe_event_with_specific_src(ev_cls_with_src, ev_types=None):
-    def _set_ev_cls_dec(handler):
+    def _observe_event_with_specific_src(handler):
         if 'callers' not in dir(handler):
             handler.callers = {}
 
@@ -63,7 +77,7 @@ def observe_event_with_specific_src(ev_cls_with_src, ev_types=None):
 
             handler.callers[e] = _Caller(_listify(ev_types), src_module)
         return handler
-    return _set_ev_cls_dec
+    return _observe_event_with_specific_src
 
 
 def observe_event_without_event_source(ev_cls, ev_types=None):

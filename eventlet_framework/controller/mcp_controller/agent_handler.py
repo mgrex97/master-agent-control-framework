@@ -3,7 +3,7 @@ from eventlet_framework.base.app_manager import BaseApp
 from eventlet_framework.lib import hub
 from eventlet_framework.event import event
 from eventlet_framework.event.mcp_event import mcp_event
-from eventlet_framework.controller.handler import observe_event, observe_event_with_specific_src, observe_event_without_event_source
+from eventlet_framework.controller.handler import observe_event, observe_event_from_self
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK, MC_STABLE
 from eventlet_framework.controller.mcp_controller.agent_controller import MachineControlAgentController
 
@@ -29,7 +29,7 @@ class AgentMCPHandler(BaseApp):
     def disconnecting_handler(self, ev: event.EventSocketConnecting):
         LOG.info('disconnect')
 
-    @observe_event_with_specific_src((mcp_event.EventMCPHello, __name__), MC_HANDSHAK)
+    @observe_event_from_self(mcp_event.EventMCPHello, MC_HANDSHAK)
     def hello_handler(self, ev):
         LOG.info('agent get hello')
         # machine id sync

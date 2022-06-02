@@ -1,5 +1,5 @@
 import logging
-from eventlet_framework.controller.handler import observe_event, observe_event_with_specific_src
+from eventlet_framework.controller.handler import observe_event, observe_event_from_self
 from eventlet_framework.base.app_manager import BaseApp
 from eventlet_framework.controller.mcp_controller.master_controller import MachineControlMasterController
 from eventlet_framework.lib import hub
@@ -33,7 +33,7 @@ class MCPMasterHandler(BaseApp):
         if conn.id in self.connection_dict:
             del ev.connection
 
-    @observe_event_with_specific_src((mcp_event.EventMCPHello, __name__), MC_HANDSHAK)
+    @observe_event_from_self(mcp_event.EventMCPHello, MC_HANDSHAK)
     def hello_handler(self, ev):
         self.logger.debug('hello ev %s', ev)
         conn = ev.msg.connection
