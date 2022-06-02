@@ -167,7 +167,7 @@ class MCPJobACK(MCPMsgBase):
         msg = super(MCPJobACK, cls).parser(
             mcp_connection, msg_type, msg_len, xid, buf)
 
-        (msg.job_id) = struct.unpack_from(
+        (msg.job_id, ) = struct.unpack_from(
             mcproto.MCP_JOB_ACK_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
 
         return msg
