@@ -8,6 +8,9 @@ from eventlet_framework.controller.mcp_controller.mcp_state import MC_HANDSHAK
 
 
 class MCPMasterHandler(BaseApp):
+    _EVENTS = event.get_event_from_module(
+        mcp_event)
+
     def __init__(self, *_args, **_kwargs):
         super(MCPMasterHandler, self).__init__(*_args, **_kwargs)
         self.name = 'mcp_master_handler'

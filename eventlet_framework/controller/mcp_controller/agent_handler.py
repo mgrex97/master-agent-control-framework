@@ -8,6 +8,9 @@ from eventlet_framework.controller.mcp_controller.agent_controller import AgentC
 
 
 class AgentMCPHandler(BaseApp):
+    _EVENTS = event.get_event_from_module(
+        mcp_event)
+
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
         self.name = 'mcp_agent_handler'
