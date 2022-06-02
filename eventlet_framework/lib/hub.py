@@ -43,6 +43,8 @@ if HUB_TYPE == 'eventlet':
     import socket
     import traceback
     import sys
+    import subprocess as org_subprocess
+    from eventlet.green import subprocess
 
     getcurrent = eventlet.getcurrent
     patch = eventlet.monkey_patch
@@ -103,6 +105,11 @@ if HUB_TYPE == 'eventlet':
                 t.wait()
             except TaskExit:
                 pass
+
+    def run_command(command, stdout=org_subprocess.PIPE, stderr=org_subprocess.PIPE) -> subprocess.Popen:
+        proce = subprocess.Popen(
+            command, stdout=stdout, stderr=stderr, bufsize=100)
+        return proce
 
     Queue = eventlet.queue.LightQueue
     QueueEmpty = eventlet.queue.Empty
