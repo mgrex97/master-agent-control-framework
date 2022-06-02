@@ -13,6 +13,15 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
+
+
+def _is_event_class(cls):
+    return inspect.isclass(cls) and issubclass(cls, EventBase)
+
+
+def get_event_from_module(module):
+    return [event for _, event in inspect.getmembers(module, _is_event_class)]
 
 
 class EventBase(object):
