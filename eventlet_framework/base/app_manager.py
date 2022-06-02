@@ -366,6 +366,11 @@ class AppManager(object):
                         continue
 
                     brick = _lookup_service_brick_by_mod_name(c.ev_source)
+
+                    # prevent handler register to self observers dict when the ev_source is self.
+                    if i.__module__ == c.ev_source:
+                        continue
+
                     if brick:
                         brick.register_observer(ev_cls, i.name,
                                                 c.ev_types)
