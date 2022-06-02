@@ -52,6 +52,9 @@ class Job:
     def parse(self, payload):
         pass
 
+    def output_handler(self, output_info):
+        pass
+
     def run_job(self):
         self.change_state(JOB_RUNING)
 
@@ -80,7 +83,7 @@ class JobCommand(Job):
         self.stdout = None
         self.stderr = None
 
-    @ classmethod
+    @classmethod
     def create_job_by_job_info(cls, connection, job_info):
         return cls(connection, job_info['cmd_job_info']['command'],
                    job_info['timeout'], job_info['state_inform_interval'])
@@ -90,7 +93,7 @@ class JobCommand(Job):
         output['cmd_job_info'] = {
             'command': self.command
         }
-        return json.dumps(output)
+        return output
 
     def run_job(self):
         super().run_job()
@@ -109,6 +112,9 @@ class JobCommand(Job):
 
     def get_stderr(self):
         hub.spawn(self.__read_output_from_green_io, self.stderr)
+
+    def output_handler(self, output_info):
+        print(output_info)
 
     def __read_output_from_green_io(self, greenpipe):
         while True:
