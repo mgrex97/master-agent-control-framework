@@ -1,5 +1,4 @@
 from eventlet_framework.lib import hub
-import asyncio
 import json
 
 # job state
@@ -81,34 +80,52 @@ class JobCommand(Job):
         self.stdout = None
         self.stderr = None
 
-    @classmethod
+    @ classmethod
     def create_job_by_job_info(cls, connection, job_info):
-        return cls(connection, job_info['command'],
+        return cls(connection, job_info['cmd_job_info']['command'],
                    job_info['timeout'], job_info['state_inform_interval'])
 
-    def run_job(self):
-        super().run_job()
-        self.__create_process(self.command)
-        hub.spawn(self.read_stdout)
-
     def job_info_serialize(self):
-        output = super().job_serialize()
+        output = super().job_info_serialize()
         output['cmd_job_info'] = {
             'command': self.command
         }
         return json.dumps(output)
 
-    async def __create_process(self, command):
-        self.proc = await asyncio.create_subprocess_shell(
-            command, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE)
+    def run_job(self):
+        super().run_job()
+        self.run_command()
 
-        self.stdin = self.proc.stdin
-        self.stdout = self.proc.stdout
-        self.stderr = self.proc.stderr
+    def run_command(self):
+        self.__process = hub.run_command(self.command)
+        self.stdin = self.__process.stdin
+        self.stdout = self.__process.stdout
+        self.stderr = self.__process.stderr
+        self.state = True
+        self.get_stdout()
 
-    async def read_stdout(self):
-        assert self.state is not None
+    def get_stdout(self):
+        hub.spawn(self.__read_output_from_green_io, self.stdout)
 
-        while self.state is JOB_RUNING:
-            get = await self.stdout.readline()
+    def get_stderr(self):
+        hub.spawn(self.__read_output_from_green_io, self.stderr)
+
+    def __read_output_from_green_io(self, greenpipe):
+        output = b''
+        while True:
+            get = greenpipe.readline()
+            # print(get.decode(encoding='utf-8'))
+            output = output + get
+            # send back to master, not implement yet.
+
+            if self.__process.poll() is not None and len(get) == 0:
+                break
+
+            hub.sleep(0)
+
+    def __get_stderr(self):
+        pass
+
+    def wait_job_end(self):
+        self.__process.wait()
+        self.state = False
