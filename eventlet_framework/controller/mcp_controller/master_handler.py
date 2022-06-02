@@ -26,11 +26,12 @@ class MCPMasterHandler(BaseApp):
         self.controller = MachineControlMasterController()
         return hub.spawn(self.controller)
 
-    @observe_event(event.EventSocketConnecting, MC_HANDSHAK)
-    def connecting_handler(self, ev: event.EventSocketConnecting):
+    @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
+    def disconnecting_handler(self, ev: event.EventSocketConnecting):
+        LOG.info('disconnect')
         conn = ev.connection
-        # save connection in this application.
-        self.connection_dict[conn.address] = conn
+        if conn.id in self.connection_dict:
+            del ev.connection
 
     @observe_event(mcp_event.EventMCPHello, MC_HANDSHAK)
     def hello_handler(self, ev):

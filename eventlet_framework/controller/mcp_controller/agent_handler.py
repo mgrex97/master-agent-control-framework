@@ -25,9 +25,9 @@ class AgentMCPHandler(BaseApp):
         self.controller = MachineControlAgentController()
         return hub.spawn(self.controller)
 
-    @observe_event(event.EventSocketConnecting, MC_HANDSHAK)
-    def connecting_handler(self, ev: event.EventSocketConnecting):
-        pass
+    @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
+    def disconnecting_handler(self, ev: event.EventSocketConnecting):
+        LOG.info('disconnect')
 
     @observe_event(mcp_event.EventMCPHello, MC_HANDSHAK)
     def hello_handler(self, ev):
