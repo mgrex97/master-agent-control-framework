@@ -40,7 +40,7 @@ if HUB_TYPE == 'eventlet':
     from eventlet import websocket
     import greenlet
     import ssl
-    import socket
+    from eventlet.green import socket
     import traceback
     import sys
     import subprocess as org_subprocess
