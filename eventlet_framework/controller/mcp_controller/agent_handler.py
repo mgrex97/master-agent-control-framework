@@ -29,7 +29,12 @@ class AgentMCPHandler(BaseApp):
     def disconnecting_handler(self, ev: event.EventSocketConnecting):
         LOG.info('disconnect')
 
-    @observe_event(mcp_event.EventMCPHello, MC_HANDSHAK)
+    @observe_event_with_specific_src((mcp_event.EventMCPHello, __name__), MC_HANDSHAK)
     def hello_handler(self, ev):
-        print('get hello msg')
-        pass
+        LOG.info('agent get hello')
+        # machine id sync
+        conn = ev.msg.connection
+        conn.id = ev.msg.connection_id
+        msg = conn.mcproto_parser.MCPHello(conn, conn.id)
+        conn.send_msg(msg)
+        conn.set_state(MC_STABLE)

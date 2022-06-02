@@ -33,9 +33,17 @@ class MCPMasterHandler(BaseApp):
         if conn.id in self.connection_dict:
             del ev.connection
 
-    @observe_event(mcp_event.EventMCPHello, MC_HANDSHAK)
+    @observe_event_with_specific_src((mcp_event.EventMCPHello, __name__), MC_HANDSHAK)
     def hello_handler(self, ev):
         self.logger.debug('hello ev %s', ev)
+        conn = ev.msg.connection
+
+        # check return connection_id
+        # assert conn.id == ev.msg.connection_id
+        LOG.info('get hello back')
+
+        conn.set_state(MC_STABLE)
+        self.connection_dict[conn.id] = conn
 
     def execute_cmd_on_remote_machine(self, machine_ip, cmd):
         conn = self.connection_dict[machine_ip]
