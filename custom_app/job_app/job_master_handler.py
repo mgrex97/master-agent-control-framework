@@ -25,7 +25,7 @@ class JobMasterHandler(BaseApp):
             ev.connection)
 
     def agent_machine_leave(self, ev):
-        del self.job_managers[ev.connection.address]
+        del self.job_managers[ev.connection.id]
 
     @observe_event(mcp_event.EventMCPJobCreateReply, MC_STABLE)
     def job_create_reply_handler(self, ev):
@@ -46,6 +46,13 @@ class JobMasterHandler(BaseApp):
 
     def job_delete(self, connection_id, job_id):
         self.job_managers[connection_id].get_job(job_id)
+
+    @observe_event(mcp_event.EventMCPJobOutput, MC_STABLE)
+    def job_output_handler(self, ev):
+        conn_id = ev.msg.connection.id
+        job_id = ev.msg.job_id
+        job = self.job_managers[conn_id].get_job(job_id)
+        job.output_handler(ev.msg.job_info)
 
     def exe_cmd_on_agent(self, address, command):
         assert address in self.job_managers
