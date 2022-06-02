@@ -36,14 +36,12 @@ from eventlet_framework.event import event
 
 # from ryu import cfg
 from eventlet_framework.lib import hub
-from eventlet_framework.lib.hub import StreamServer
 from eventlet_framework.lib import ip
 from eventlet_framework.base.app_manager import BaseApp, lookup_service_brick
 from eventlet_framework.protocol.mcp import mcp_common, mcp_parser, mcp_v_1_0 as mcproto, mcp_parser_v_1_0 as mcproto_parser
 
-logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(
-    'eventlent_framework.controller.tshark.tshark_controller')
+    'eventlent_framework.controller.controller.mcp_controller')
 
 
 def _split_addr(addr):
