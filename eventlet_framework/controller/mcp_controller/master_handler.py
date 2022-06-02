@@ -48,7 +48,7 @@ class MCPMasterHandler(BaseApp):
     def execute_cmd_on_remote_machine(self, machine_ip, cmd):
         conn = self.connection_dict[machine_ip]
 
-        msg_cmd_request = conn.mcproto_parser.MCPExecuteCommandRequest(
-            conn, job_id=2, command=cmd)
+        msg_cmd_request = conn.mcproto_parser.MCPJobCreateRequest(
+            conn, timeout=10, command=cmd)
 
         conn.send_msg(msg_cmd_request)
