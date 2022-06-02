@@ -157,6 +157,7 @@ class MachineConnection(object):
                     read_len = remaining_read_len
                 ret = self.socket.recv(read_len)
             except SocketTimeout:
+                LOG.warning('Socket timeout.')
                 continue
             except ssl.SSLError:
                 # eventlet throws SSLError (which is a subclass of IOError)
