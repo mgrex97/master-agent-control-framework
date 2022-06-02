@@ -1,3 +1,4 @@
+import json
 import struct
 from eventlet_framework.protocol.mcp import mcp_v_1_0 as mcproto
 from eventlet_framework.lib.pack_utils import msg_pack_into
@@ -86,12 +87,14 @@ class MCPJobIDWithInfo(MCPMsgBase):
         if msg.job_info_len < len(msg.job_info_bytes):
             msg.job_info_bytes = msg.job_info_bytes[:msg.job_info_len]
 
-        msg.job_info = msg.job_info_bytes.decode(encoding='utf-8')
+        msg.job_info_str = msg.job_info_bytes.decode(encoding='utf-8')
+        msg.job_info = json.loads(msg.job_info_str)
 
         return msg
 
     def serialize(self):
-        self.job_info_bytes = self.job_info.encode('utf-8')
+        self.job_info_str = json.dumps(self.job_info)
+        self.job_info_bytes = self.job_info_str.encode('utf-8')
         self.job_info_len = len(self.job_info_bytes)
 
         return super().serialize()
@@ -138,12 +141,18 @@ class MCPJobCreateRequest(MCPMsgBase):
         if msg.job_info_len < len(msg.job_info_bytes):
             msg.job_info_bytes = msg.job_info_bytes[:msg.job_info_len]
 
-        msg.job_info = msg.job_info_bytes.decode(encoding='utf-8')
+        msg.job_info_str = msg.job_info_bytes.decode(encoding='utf-8')
+        msg.job_info = json.loads(msg.job_info_str)
 
         return msg
 
     def serialize(self):
-        self.job_info_bytes = self.job_info.encode('utf-8')
+        if isinstance(self.job_info, dict):
+            self.job_info_str = json.dumps(self.job_info)
+        else:
+            self.job_info_str = self.job_info
+
+        self.job_info_bytes = self.job_info_str.encode('utf-8')
         self.job_info_len = len(self.job_info_bytes)
 
         return super().serialize()
