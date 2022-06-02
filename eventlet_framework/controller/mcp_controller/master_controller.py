@@ -46,10 +46,10 @@ class MasterConnection(MachineConnection):
         return m_id
 
     def serve(self):
-        if self.id is None:
+        if self.id == 0:
             self.id = self._get_new_machine_id()
 
-        msg_hello = self.mcproto_parser.MCPHello(self)
+        msg_hello = self.mcproto_parser.MCPHello(self, self.id)
 
         self.send_msg(msg_hello)
         return super().serve()
