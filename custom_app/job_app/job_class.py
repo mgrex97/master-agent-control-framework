@@ -25,6 +25,10 @@ class Job:
     @classmethod
     def create_job_by_job_info(cls, connection, job_info, job_id):
         assert job_id > 0
+
+        if isinstance(job_info, str):
+            job_info = json.loads(job_info)
+
         job_type = job_info['job_type']
         job_obj = cls._Job_Types[job_type].create_job_by_job_info(
             connection, job_info)
