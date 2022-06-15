@@ -22,7 +22,15 @@ import sys
 import six
 
 
-LOG = logging.getLogger('ryu.utils')
+LOG = logging.getLogger('async_framwork.utils')
+
+
+def _listify(may_list):
+    if may_list is None:
+        may_list = []
+    if not isinstance(may_list, list):
+        may_list = [may_list]
+    return may_list
 
 
 def load_source(name, pathname):
