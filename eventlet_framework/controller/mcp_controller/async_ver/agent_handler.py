@@ -1,11 +1,11 @@
 import logging
-from eventlet_framework.base.app_manager import BaseApp
-from eventlet_framework.lib import hub
+from eventlet_framework.base.async_app_manager import BaseApp
+from eventlet_framework.lib.async_hub import app_hub
 from eventlet_framework.event import event
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.controller.handler import observe_event, observe_event_from_self
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK, MC_STABLE
-from eventlet_framework.controller.mcp_controller.agent_controller import MachineControlAgentController
+from eventlet_framework.controller.mcp_controller.async_ver.agent_controller import MachineControlAgentController
 
 LOG = logging.getLogger(
     'eventlent_framework.controller.mcp_controller.agent_controller')
@@ -21,9 +21,9 @@ class AgentMCPHandler(BaseApp):
         self.controller = None
 
     def start(self):
-        super().start()
+        task = super().start()
         self.controller = MachineControlAgentController()
-        return hub.spawn(self.controller)
+        return [app_hub.spawn(self.controller.attempt_connecting_loop, interval=2), task]
 
     @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
     def disconnecting_handler(self, ev: event.EventSocketConnecting):
