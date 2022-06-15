@@ -156,7 +156,7 @@ class MachineConnection(object):
             while self.state != MC_DISCONNECT:
                 try:
                     read_len = min_read_len
-                    if remaining_read_len > min_read_len:
+                    if remaining_read_len > 0:
                         read_len = remaining_read_len
                     ret = await self.reader.readexactly(read_len)
                 except SocketTimeout:
