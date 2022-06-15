@@ -5,7 +5,8 @@ import inspect
 import socket
 import threading
 from eventlet_framework.lib import ip
-from signal import SIGINT, SIGTERM, SIGTSTP
+from signal import SIGINT
+from eventlet_framework.utils import _listify
 
 
 class SpawnFailed(Exception):
@@ -184,7 +185,7 @@ class StreamServer(object):
 
     async def serve_forever(self):
         if self.server is None:
-            await app_hub.spawn(self._init_server)
+            await self._init_server()
 
         async with self.server:
             self.LOG.info('Stream Sever start to serve.')
