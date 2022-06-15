@@ -1,12 +1,9 @@
-from platform import machine
 from socket import TCP_NODELAY
 from socket import IPPROTO_TCP
 import traceback
 import logging
 import contextlib
 from asyncio import CancelledError, StreamWriter, StreamReader
-
-from yaml import add_representer
 
 from eventlet_framework.controller.mcp_controller.async_ver.mcp_controller import MachineConnection
 from eventlet_framework.controller.mcp_controller.async_ver.mcp_state import MC_DISCONNECT, MC_HANDSHAK
