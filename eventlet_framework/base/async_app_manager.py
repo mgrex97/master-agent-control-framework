@@ -86,7 +86,7 @@ class BaseApp(object):
     def stop(self):
         async def _stop():
             self.is_active = False
-            self._send_event(self.event_loop_stop, None)
+            await app_hub.spawn(self._send_event, self.event_loop_stop, None)
 
             if isinstance(self._event_loop_task, asyncio.Task):
                 app_hub.kill(self._event_loop_task)
