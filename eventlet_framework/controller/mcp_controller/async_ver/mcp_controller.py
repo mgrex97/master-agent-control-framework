@@ -31,8 +31,7 @@ from socket import SHUT_WR
 from socket import timeout as SocketTimeout
 import ssl
 
-from pytest import param
-
+from eventlet_framework.base.async_app_manager import BaseApp, lookup_service_brick
 from eventlet_framework.lib import async_hub
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
 from eventlet_framework.event.mcp_event import mcp_event
@@ -114,9 +113,8 @@ class MachineConnection(object):
         # self.mcp_proto.MAX_XID)
         self.id = 0  # machine_id is unknown yet
         self.state = None
-        self.mcp_brick = None
-        # self.mcp_brick: BaseApp = lookup_service_brick(
-        # mcp_brick_name)
+        self.mcp_brick: BaseApp = lookup_service_brick(
+            mcp_brick_name)
         self.set_state(MC_HANDSHAK)
 
     def _close_write(self):
@@ -156,8 +154,9 @@ class MachineConnection(object):
             while self.state != MC_DISCONNECT:
                 try:
                     read_len = min_read_len
-                    if remaining_read_len > 0:
+                    if read_len > remaining_read_len:
                         read_len = remaining_read_len
+
                     ret = await self.reader.readexactly(read_len)
                 except SocketTimeout:
                     LOG.warning('Socket timeout.')
