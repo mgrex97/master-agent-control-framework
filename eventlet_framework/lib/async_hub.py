@@ -25,7 +25,61 @@ Queue = asyncio.Queue
 logging.basicConfig(level=logging.INFO)
 
 
-class Hub:
+class TaskLoop(object):
+    def __init__(self, hub, tasks, handler=None, timeout=None):
+        self.hub = hub
+        self.tasks = _listify(tasks)
+        self._init_iter()
+        self.handler = handler
+        self.timeout = timeout
+        self.LOG = logging.getLogger('Task Loop: ')
+
+    def print_task_info(self, task: asyncio.Task):
+        pass
+
+    def reset_tasks(self, tasks):
+        self.tasks = _listify(tasks)
+        self._init_iter()
+
+    def _init_iter(self):
+        self.tasks_iter = iter(self.tasks)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            task: asyncio.Task = next(self.tasks_iter)
+        except StopIteration:
+            raise StopAsyncIteration
+
+        # self.LOG.info(f'*** wait task <{task.get_name()}> running... ***')
+        await task
+        # self.LOG.info(f'*** task <{task.get_name()}> running end... ***')
+
+        if self.handler is None:
+            return task
+
+        self.print_task_info(task=task)
+
+        result = task.result()
+
+        if inspect.isasyncgenfunction(task):
+            await self.handler(task.result())
+        else:
+            self.handler(result)
+
+        return task
+
+    def wait_tasks(self):
+        async def _wait_tasks():
+            async for _ in self:
+                pass
+
+        return self.hub.spawn(_wait_tasks)
+
+
+class Hub():
     LOG = logging.getLogger('async_hub')
 
     def __init__(self):
