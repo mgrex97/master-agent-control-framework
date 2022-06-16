@@ -5,7 +5,7 @@ import logging
 from pprint import pprint as pp
 
 
-async def application_init_and_run(app_mgr):
+async def application_init_and_run():
     app_hub.setup_eventloop()
 
     logging.basicConfig(level=logging.INFO)
