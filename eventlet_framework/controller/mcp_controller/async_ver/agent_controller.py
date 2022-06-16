@@ -84,4 +84,5 @@ async def machine_connection_factory(reader: StreamReader, writer: StreamWriter)
             """
         finally:
             LOG.info(f'Disconnect to {address}')
+            serve_task.cancel()
             machine_connection.set_state(MC_DISCONNECT)

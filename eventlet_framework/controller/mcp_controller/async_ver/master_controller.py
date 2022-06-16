@@ -56,7 +56,8 @@ async def machine_connection_factory(reader: StreamReader, writer: StreamWriter)
              *address)
     with contextlib.closing(MasterConnection(reader, writer)) as machine_connection:
         try:
-            await app_hub.spawn(machine_connection.serve)
+            connection_serve = app_hub.spawn(machine_connection.serve)
+            await connection_serve
         except Exception as e:
             # Something went wrong.
             # Especially malicious switch can send malformed packet,
@@ -73,4 +74,5 @@ async def machine_connection_factory(reader: StreamReader, writer: StreamWriter)
             LOG.info("Connection cancel.")
         finally:
             LOG.info(f"Connection from {address[0]}:{address[1]} disconnect.")
+            connection_serve.cancel()
             machine_connection.set_state(MC_DISCONNECT)
