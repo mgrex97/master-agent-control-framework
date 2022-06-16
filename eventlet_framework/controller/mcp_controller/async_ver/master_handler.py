@@ -2,7 +2,7 @@ import logging
 from eventlet_framework.controller.handler import observe_event, observe_event_from_self
 from eventlet_framework.base.async_app_manager import BaseApp
 from eventlet_framework.controller.mcp_controller.async_ver.master_controller import MachineControlMasterController
-from eventlet_framework.lib.async_hub import app_hub
+from eventlet_framework.lib.hub import app_hub
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.event import event
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_FEATURE, MC_HANDSHAK, MC_STABLE

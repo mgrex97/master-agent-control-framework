@@ -1,6 +1,6 @@
 import logging
 
-from eventlet_framework.lib.async_hub import app_hub
+from eventlet_framework.lib.hub import app_hub
 from eventlet_framework.controller.mcp_controller.async_ver.agent_controller import MachineControlAgentController
 from async_util import print_loop_stack
 

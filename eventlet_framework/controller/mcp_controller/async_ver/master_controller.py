@@ -7,8 +7,8 @@ from asyncio import CancelledError, StreamWriter, StreamReader
 
 from eventlet_framework.controller.mcp_controller.async_ver.mcp_controller import MachineConnection
 from eventlet_framework.controller.mcp_controller.async_ver.mcp_state import MC_DISCONNECT, MC_HANDSHAK
-from eventlet_framework.lib import async_hub
-from eventlet_framework.lib.async_hub import app_hub
+from eventlet_framework.lib import hub
+from eventlet_framework.lib.hub import app_hub
 
 LOG = logging.getLogger(
     'eventlent_framework.controller.mcp_controller.master_controller')
@@ -21,7 +21,7 @@ class MachineControlMasterController(object):
         self._clients = {}
 
     async def server_loop(self):
-        server = async_hub.StreamServer(
+        server = hub.StreamServer(
             (self.listen_host, self.listen_port), machine_connection_factory)
         await server.serve_forever()
 

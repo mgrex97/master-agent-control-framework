@@ -7,8 +7,8 @@ import gc
 from eventlet_framework.controller.handler import register_instance, get_dependent_services
 from eventlet_framework.event import event
 from eventlet_framework.event.event import EventReplyBase, EventRequestBase
-from eventlet_framework.lib import async_hub
-from eventlet_framework.lib.async_hub import TaskLoop, app_hub
+from eventlet_framework.lib import hub
+from eventlet_framework.lib.hub import TaskLoop, app_hub
 from eventlet_framework import utils
 from eventlet_framework.utils import _listify
 
@@ -62,7 +62,7 @@ class BaseApp(object):
         self.observers = {}
         self.tasks = []
         self._event_loop_task = None
-        self.events = async_hub.Queue()
+        self.events = hub.Queue()
 
         if hasattr(self.__class__, 'LOGGER_NAME'):
             self.logger = logging.getLogger(self.__class__.LOGGER_NAME)
@@ -180,7 +180,7 @@ class BaseApp(object):
 
         assert isinstance(req, EventRequestBase)
         req.sync = True
-        req.reply_q = async_hub.Queue()
+        req.reply_q = hub.Queue()
         self.send_event(req.dst, req)
         # going to sleep for the reply
         return req.reply_q.get()

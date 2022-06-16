@@ -33,7 +33,7 @@ from eventlet_framework.controller.mcp_controller.async_ver.mcp_state import MC_
 from eventlet_framework.controller.mcp_controller.async_ver.mcp_controller import MachineConnection
 
 # from ryu import cfg
-from eventlet_framework.lib import async_hub
+from eventlet_framework.lib import hub
 
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(
@@ -46,7 +46,7 @@ class MachineControlAgentController(object):
         self.port = port
 
     async def attempt_connecting_loop(self, interval=None):
-        agent = async_hub.StreamClient(
+        agent = hub.StreamClient(
             addr=(self.host, self.port))
         await agent.connect_loop(machine_connection_factory, interval=interval)
 
@@ -65,7 +65,7 @@ async def machine_connection_factory(reader: StreamReader, writer: StreamWriter)
 
     with contextlib.closing(AgentConnection(reader, writer)) as machine_connection:
         try:
-            serve_task = async_hub.app_hub.spawn(machine_connection.serve)
+            serve_task = hub.app_hub.spawn(machine_connection.serve)
             await serve_task
         except Exception as e:
             # Something went wrong.

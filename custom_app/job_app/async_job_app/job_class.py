@@ -2,7 +2,7 @@ import logging
 import json
 import asyncio
 import traceback
-from eventlet_framework.lib import async_hub
+from eventlet_framework.lib import hub
 from eventlet_framework.controller.mcp_controller.async_ver.mcp_controller import MachineConnection
 from pprint import pprint
 
@@ -138,8 +138,8 @@ class JobCommand(Job):
                 self.state = True
                 self.read_stdout()
                 # wait std read task end
-                task_loop = async_hub.TaskLoop(
-                    async_hub.app_hub, list(self.std_task.values()))
+                task_loop = hub.TaskLoop(
+                    hub.app_hub, list(self.std_task.values()))
                 await task_loop.wait_tasks()
             except asyncio.CancelledError:
                 pass
@@ -155,7 +155,7 @@ class JobCommand(Job):
             else:
                 raise ProcessStillRunning()
 
-        self.command_running_task = async_hub.app_hub.spawn(_run_command)
+        self.command_running_task = hub.app_hub.spawn(_run_command)
         return self.command_running_task
 
     def read_stdout(self):
@@ -199,12 +199,12 @@ class JobCommand(Job):
 
         # if task not exist yet.
         if (task := self.std_task.get(type, None)) is None:
-            task = async_hub.app_hub.spawn(__read_output_from_std, std)
+            task = hub.app_hub.spawn(__read_output_from_std, std)
 
         # if stdout is done, create new task.
         if task.done():
             del task
-            task = async_hub.app_hub.spawn(__read_output_from_std, std)
+            task = hub.app_hub.spawn(__read_output_from_std, std)
 
         self.std_task.setdefault(type, task)
 
@@ -239,7 +239,7 @@ class JobCommand(Job):
 
         # if there is std task exist.
         if self.std_task:
-            return async_hub.app_hub.spawn(_subprocess_stop, process)
+            return hub.app_hub.spawn(_subprocess_stop, process)
         else:
             None
 

@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from eventlet_framework.lib import async_hub
-from eventlet_framework.lib.async_hub import app_hub
+from eventlet_framework.lib import hub
+from eventlet_framework.lib.hub import app_hub
 from custom_app.job_app.async_job_app.job_class import JOB_ASYNC, JOB_CREATE_FAILD, JOB_DELETE, JOB_RUNING, Job, JobCommand
 from eventlet_framework.base.async_app_manager import BaseApp
 from eventlet_framework.event.mcp_event import mcp_event
@@ -21,7 +21,7 @@ class JobMasterHandler(BaseApp):
         self.name = 'job_master_handler'
         self.job_managers = {}
         self.conn_map = {}
-        self.job_queue = async_hub.Queue()
+        self.job_queue = hub.Queue()
 
     def start(self):
         task = super().start()

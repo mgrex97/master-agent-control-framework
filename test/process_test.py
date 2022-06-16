@@ -1,7 +1,7 @@
 import logging
 import json
 import asyncio
-from eventlet_framework.lib import async_hub
+from eventlet_framework.lib import hub
 from pprint import pprint
 
 # job state
@@ -130,11 +130,11 @@ class JobCommand(Job):
             self.stderr = self.__process.stderr
             self.state = True
             self.read_stdout()
-            task_loop = async_hub.TaskLoop(
-                async_hub.app_hub, list(self.std_task.values()))
+            task_loop = hub.TaskLoop(
+                hub.app_hub, list(self.std_task.values()))
             await task_loop.wait_tasks()
 
-        return async_hub.app_hub.spawn(_run_command)
+        return hub.app_hub.spawn(_run_command)
 
     def read_stdout(self):
         self.read_output_from_std(self.stdout, 'out')
@@ -168,12 +168,12 @@ class JobCommand(Job):
 
         # if task not exist yet.
         if (task := self.std_task.get(type, None)) is None:
-            task = async_hub.app_hub.spawn(__read_output_from_std, std)
+            task = hub.app_hub.spawn(__read_output_from_std, std)
 
         # if stdout is done, create new task.
         if task.done():
             del task
-            task = async_hub.app_hub.spawn(__read_output_from_std, std)
+            task = hub.app_hub.spawn(__read_output_from_std, std)
 
         self.std_task.setdefault(type, task)
 
@@ -187,14 +187,14 @@ class JobCommand(Job):
                 if not task.done():
                     task.cancel()
 
-            task_loop = async_hub.TaskLoop(async_hub.app_hub.loop, tasks)
+            task_loop = hub.TaskLoop(hub.app_hub.loop, tasks)
             await task_loop.wait_tasks()
 
         self.stdin = None
         self.stderr = None
         self.stdout = None
 
-        return async_hub.app_hub.spawn(_subprocess_stop)
+        return hub.app_hub.spawn(_subprocess_stop)
 
     def __del__(self):
         self.stop()
@@ -203,7 +203,7 @@ class JobCommand(Job):
 job = JobCommand('ping 8.8.8.8')
 task = job.run_job()
 
-async_hub.app_hub.joinall([task])
+hub.app_hub.joinall([task])
 
 """
    async def test_job():

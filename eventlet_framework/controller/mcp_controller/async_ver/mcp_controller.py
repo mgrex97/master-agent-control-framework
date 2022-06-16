@@ -32,7 +32,7 @@ from socket import timeout as SocketTimeout
 import ssl
 
 from eventlet_framework.base.async_app_manager import BaseApp, lookup_service_brick
-from eventlet_framework.lib import async_hub
+from eventlet_framework.lib import hub
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.event import event
@@ -104,7 +104,7 @@ class MachineConnection(object):
 
         # The limit is arbitrary. We need to limit queue size to
         # prevent it from eating memory up.
-        self.send_q = async_hub.Queue(1000)
+        self.send_q = hub.Queue(1000)
 
         self.mcproto_parser = mcproto_parser
         self.mcproto = mcproto
@@ -210,7 +210,7 @@ class MachineConnection(object):
                         count = 0
                         await asyncio.sleep(0)
 
-        return async_hub.app_hub.spawn(_async_recv_loop)
+        return hub.app_hub.spawn(_async_recv_loop)
 
     async def _send_loop(self):
         try:
@@ -258,7 +258,7 @@ class MachineConnection(object):
 
             return msg_enqueued
 
-        return async_hub.app_hub.spawn(_send, buf, close_socket)
+        return hub.app_hub.spawn(_send, buf, close_socket)
 
     def set_xid(self, msg: mcproto_parser.MCPMsgBase):
         self.xid += 1
@@ -274,10 +274,10 @@ class MachineConnection(object):
             msg.serialize()
             LOG.debug('send_msg %s', msg)
             return await self.send(msg.buf, close_socket=close_socket)
-        return async_hub.app_hub.spawn(_send_msg, msg, close_socket)
+        return hub.app_hub.spawn(_send_msg, msg, close_socket)
 
     async def serve(self):
-        send_loop_task = async_hub.app_hub.spawn(self._send_loop)
+        send_loop_task = hub.app_hub.spawn(self._send_loop)
 
         # send connection event
         connect_ev = event.EventSocketConnecting(self)
@@ -293,13 +293,13 @@ class MachineConnection(object):
         # send socket connecting event
         exception = None
         try:
-            recv_loop_task = async_hub.app_hub.spawn(self._recv_loop)
+            recv_loop_task = hub.app_hub.spawn(self._recv_loop)
             await recv_loop_task
         except Exception as e:
             exception = e
         finally:
-            async_hub.app_hub.kill(send_loop_task)
-            async_hub.app_hub.kill(recv_loop_task)
+            hub.app_hub.kill(send_loop_task)
+            hub.app_hub.kill(recv_loop_task)
             self.is_active = False
             if exception is not None:
                 raise exception
