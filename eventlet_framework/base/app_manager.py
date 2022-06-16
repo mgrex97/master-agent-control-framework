@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import itertools
 import logging
@@ -7,7 +8,9 @@ from eventlet_framework.controller.handler import register_instance, get_depende
 from eventlet_framework.event import event
 from eventlet_framework.event.event import EventReplyBase, EventRequestBase
 from eventlet_framework.lib import hub
+from eventlet_framework.lib.hub import TaskLoop, app_hub
 from eventlet_framework import utils
+from eventlet_framework.utils import _listify
 
 LOG = logging.getLogger('eventlet_framework.base.app_manager')
 
@@ -38,9 +41,15 @@ def unregister_app(app):
     SERVICE_BRICKS.pop(app.name)
 
 
+class EventLoopStop():
+    pass
+
+
 class BaseApp(object):
     _CONTEXT = {}
     _EVENTS = []
+
+    event_loop_stop = EventLoopStop
 
     @classmethod
     def context_iteritems(cls):
@@ -51,10 +60,9 @@ class BaseApp(object):
         self.name = self.__class__.__name__
         self.event_handlers = {}
         self.observers = {}
-        self.threads = []
-        self.main_thread = None
-        self.events = hub.Queue(128)
-        self._events_sem = hub.BoundedSemaphore(self.events.maxsize)
+        self.tasks = []
+        self._event_loop_task = None
+        self.events = hub.Queue()
 
         if hasattr(self.__class__, 'LOGGER_NAME'):
             self.logger = logging.getLogger(self.__class__.LOGGER_NAME)
@@ -72,22 +80,24 @@ class BaseApp(object):
         """
         Hook that is called after startup initialization is done.
         """
-        self.threads.append(hub.spawn(self._event_loop))
+        self._event_loop_task = app_hub.spawn(self._event_loop)
+        return self._event_loop_task
 
     def stop(self):
-        if self.main_thread:
-            hub.kill(self.main_thread)
-        self.is_active = False
-        self._send_event(self._event_stop, None)
-        hub.joinall(self.threads)
+        async def _stop():
+            self.is_active = False
+            await app_hub.spawn(self._send_event, self.event_loop_stop, None)
 
-    def set_main_thread(self, thread):
-        """
-        Set self.main_thread so that stop() can terminate it.
+            if isinstance(self._event_loop_task, asyncio.Task):
+                app_hub.kill(self._event_loop_task)
+                await self._event_loop_task
 
-        Only AppManager.instantiate_apps should call this function.
-        """
-        self.main_thread = thread
+            for task in self.tasks:
+                LOG.info(f"App Stop, wait task <{task.get_name()}> stop...")
+                app_hub.kill(task)
+                await task
+
+        return app_hub.spawn(_stop)
 
     def register_handler(self, ev_cls, handler):
         assert callable(handler)
@@ -175,29 +185,31 @@ class BaseApp(object):
         # going to sleep for the reply
         return req.reply_q.get()
 
-    def _event_loop(self):
-        while self.is_active or not self.events.empty():
-            ev, state = self.events.get()
-            self._events_sem.release()
-            if ev == self._event_stop:
-                continue
-            handlers = self.get_handlers(ev, state)
-            for handler in handlers:
-                try:
-                    handler(ev)
-                except hub.TaskExit:
-                    # Normal exit.
-                    # Propagate upwards, so we leave the event loop.
-                    raise
-                except:
-                    LOG.exception('%s: Exception occurred during handler processing. '
-                                  'Backtrace from offending handler '
-                                  '[%s] servicing event [%s] follows.',
-                                  self.name, handler.__name__, ev.__class__.__name__)
+    async def _event_loop(self):
+        try:
+            while self.is_active or self.events.empty():
+                ev, state = await self.events.get()
+                handlers = self.get_handlers(ev, state)
+                for handler in handlers:
+                    try:
+                        handler(ev)
+                    except:
+                        LOG.exception('%s: Exception occurred during handler processing. '
+                                      'Backtrace from offending handler '
+                                      '[%s] servicing event [%s] follows.',
+                                      self.name, handler.__name__, ev.__class__.__name__)
+        except asyncio.CancelledError as e:
+            LOG.info(f'App {self.name}, _event_loop been canceled.')
 
-    def _send_event(self, ev, state):
-        self._events_sem.acquire()
-        self.events.put((ev, state))
+        # clean events queue.
+        try:
+            while self.events.get_nowait():
+                pass
+        except asyncio.QueueEmpty:
+            pass
+
+    async def _send_event(self, ev, state):
+        await self.events.put((ev, state))
 
     def send_event(self, name, ev, state=None):
         """
@@ -209,10 +221,13 @@ class BaseApp(object):
                 ev.src = self.name
             LOG.debug("EVENT %s->%s %s",
                       self.name, name, ev.__class__.__name__)
-            SERVICE_BRICKS[name]._send_event(ev, state)
+            send_task = app_hub.spawn(
+                SERVICE_BRICKS[name]._send_event, ev, state)
+            return send_task
         else:
             LOG.debug("EVENT LOST %s->%s %s",
                       self.name, name, ev.__class__.__name__)
+            return None
 
     def send_event_to_observers(self, ev, state=None):
         """
@@ -237,7 +252,7 @@ class BaseApp(object):
         else:
             self.send_event(rep.dst, rep)
 
-    def close(self):
+    async def close(self):
         """
         teardown method.
         The method name, close, is chosen for python context manager
@@ -250,25 +265,32 @@ class AppManager(object):
     _instance = None
 
     @staticmethod
-    def run_apps(app_lists):
-        """Run a set of Ryu applications
+    async def run_apps(app_lists):
+        """Run a set of asunc applications
 
         A convenient method to load and instantiate apps.
         This blocks until all relevant apps stop.
         """
+        hub = app_hub
         app_mgr = AppManager.get_instance()
         # load all app which in app_lists. (include dependent app)
         # All of app cls are loaded into app_mgr.applications_cls
         app_mgr.load_apps(app_lists)
         contexts = app_mgr.create_contexts()
-        services = app_mgr.instantiate_apps(**contexts)
+        tasks = app_mgr.instantiate_apps(**contexts)
+        task_loop = TaskLoop(hub, tasks)
         try:
-            hub.joinall(services)
+            await task_loop.wait_tasks()
         finally:
             app_mgr.close()
-            for t in services:
-                t.kill()
-            hub.joinall(services)
+            # kill all tasks
+            for task in tasks:
+                hub.kill(task)
+
+            # wait tasks are killed
+            for task in tasks:
+                await task
+
             gc.collect()
 
     @staticmethod
@@ -282,7 +304,6 @@ class AppManager(object):
         self.applications = {}
         self.contexts_cls = {}
         self.contexts = {}
-        self.close_sem = hub.Semaphore()
 
     def load_app(self, name):
         mod = utils.import_module(name)
@@ -429,41 +450,44 @@ class AppManager(object):
         self._update_bricks()
         self.report_bricks()
 
-        threads = []
+        tasks = []
         for app in self.applications.values():
-            t = app.start()
-            if t is not None:
-                app.set_main_thread(t)
-                threads.append(t)
-        return threads
+            task_list = _listify(app.start())
+            if isinstance(task_list, list):
+                tasks.extend(task_list)
+        return tasks
 
     @staticmethod
-    def _close(app):
+    async def _close(app):
         close_method = getattr(app, 'close', None)
         if callable(close_method):
-            close_method()
+            await close_method()
 
     def uninstantiate(self, name):
-        app = self.applications.pop(name)
-        unregister_app(app)
-        for app_ in SERVICE_BRICKS.values():
-            app_.unregister_observer_all_event(name)
-        app.stop()
-        self._close(app)
-        events = app.events
-        if not events.empty():
-            app.logger.debug('%s events remains %d', app.name, events.qsize())
+        async def _uninstantiate(name):
+            app: BaseApp = self.applications.pop(name)
+            unregister_app(app)
+            for app_ in SERVICE_BRICKS.values():
+                app_.unregister_observer_all_event(name)
+            await app.stop()
+            await self._close(app)
+            events = app.events
+            if not events.empty():
+                app.logger.debug('%s events remains %d',
+                                 app.name, events.qsize())
 
-    def close(self):
-        def close_all(close_dict):
+        return app_hub.spawn(_uninstantiate, name)
+
+    async def close(self):
+        async def close_all(close_dict):
             for app in close_dict.values():
-                self._close(app)
+                await self._close(app)
             close_dict.clear()
 
-        # This semaphore prevents parallel execution of this function,
-        # as run_apps's finally clause starts another close() call.
-        with self.close_sem:
-            for app_name in list(self.applications.keys()):
-                self.uninstantiate(app_name)
-            assert not self.applications
-            close_all(self.contexts)
+        uninstantiate_tasks = []
+        for app_name in list(self.applications.keys()):
+            uninstantiate_tasks.append(self.uninstantiate(app_name))
+
+        await TaskLoop(app_hub, uninstantiate_tasks).wait_tasks()
+        assert not self.applications
+        await close_all(self.contexts)
