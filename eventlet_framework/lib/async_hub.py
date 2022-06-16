@@ -23,7 +23,7 @@ class ServerInitFailed(Exception):
 
 Queue = asyncio.Queue
 
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.WARNING)
 
 
 class TaskLoop(object):
@@ -34,6 +34,7 @@ class TaskLoop(object):
         self.handler = handler
         self.timeout = timeout
         self.LOG = logging.getLogger('Task Loop: ')
+        self.LOG.setLevel(logging.WARNING)
 
     def print_task_info(self, task: asyncio.Task):
         pass
@@ -82,6 +83,7 @@ class TaskLoop(object):
 
 class Hub():
     LOG = logging.getLogger('async_hub')
+    LOG.setLevel(logging.WARNING)
 
     def __init__(self):
         self.setup_eventloop()
