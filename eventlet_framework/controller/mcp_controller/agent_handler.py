@@ -1,6 +1,6 @@
 import logging
-from eventlet_framework.base.app_manager import BaseApp
-from eventlet_framework.lib import hub
+from eventlet_framework.base.async_app_manager import BaseApp
+from eventlet_framework.lib.hub import app_hub
 from eventlet_framework.event import event
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.controller.handler import observe_event, observe_event_from_self
@@ -21,9 +21,9 @@ class AgentMCPHandler(BaseApp):
         self.controller = None
 
     def start(self):
-        super().start()
+        task = super().start()
         self.controller = MachineControlAgentController()
-        return hub.spawn(self.controller)
+        return [app_hub.spawn(self.controller.attempt_connecting_loop, interval=2), task]
 
     @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
     def disconnecting_handler(self, ev: event.EventSocketConnecting):

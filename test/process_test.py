@@ -1,9 +1,7 @@
 import logging
 import json
 import asyncio
-import traceback
 from eventlet_framework.lib import hub
-from eventlet_framework.controller.mcp_controller.mcp_controller import MachineConnection
 from pprint import pprint
 
 # job state
@@ -88,16 +86,11 @@ class ProcessNotRunningYet(Exception):
     pass
 
 
-class ProcessStillRunning(Exception):
-    pass
-
-
 @Job.register_job_type(CMD_JOB)
 class JobCommand(Job):
     def __init__(self, command, connection=None, timeout=60, state_inform_interval=5):
         super().__init__(connection, timeout, state_inform_interval)
         self.command = command
-        self.command_running_task = None
         self.__process = None
         self.stdin = None
         self.stdout = None
@@ -121,42 +114,27 @@ class JobCommand(Job):
 
     def run_job(self):
         super().run_job()
-        self.run_command()
+        return self.run_command()
 
-    def run_command(self, auto_stop=False):
+    def run_command(self):
         async def _run_command():
-            try:
-                self.__process = await asyncio.create_subprocess_shell(
-                    self.command,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
+            print(f'run {self.command}')
+            self.__process = await asyncio.create_subprocess_shell(
+                self.command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
 
-                self.stdin = self.__process.stdin
-                self.stdout = self.__process.stdout
-                self.stderr = self.__process.stderr
-                self.state = True
-                self.read_stdout()
-                # wait std read task end
-                task_loop = hub.TaskLoop(
-                    hub.app_hub, list(self.std_task.values()))
-                await task_loop.wait_tasks()
-            except asyncio.CancelledError:
-                pass
-            finally:
-                self.stop()
-                self.command_running_task = None
+            self.stdin = self.__process.stdin
+            self.stdout = self.__process.stdout
+            self.stderr = self.__process.stderr
+            self.state = True
+            self.read_stdout()
+            task_loop = hub.TaskLoop(
+                hub.app_hub, list(self.std_task.values()))
+            await task_loop.wait_tasks()
 
-        if self.command_running_task is None:
-            pass
-        elif not self.command_running_task.done():
-            if auto_stop is True:
-                self.command_running_task.cancel()
-            else:
-                raise ProcessStillRunning()
-
-        self.command_running_task = hub.app_hub.spawn(_run_command)
-        return self.command_running_task
+        return hub.app_hub.spawn(_run_command)
 
     def read_stdout(self):
         self.read_output_from_std(self.stdout, 'out')
@@ -180,22 +158,13 @@ class JobCommand(Job):
             raise ProcessNotRunningYet()
 
         async def __read_output_from_std(std: asyncio.StreamReader):
-            try:
-                while self.state and self.__process:
-                    # get = await std.readline()
-                    get = await std.readline()
-                    print(get)
-                    if len(get) == 0:
-                        break
-                    output_info = super(JobCommand, self).job_info_serialize()
-                    output_info['output'] = get.decode(encoding='utf-8')
+            while self.state and self.__process:
+                get = await std.readline()
+                # get, err = await self.__process.communicate()
+                print(get)
 
-                    output_msg = self.connection.mcproto_parser.MCPJobOutput(
-                        self.connection, self.id, json.dumps(output_info))
-
-                    self.connection.send_msg(output_msg)
-            except asyncio.CancelledError:
-                pass
+                output_info = super(JobCommand, self).job_info_serialize()
+                output_info['output'] = get.decode(encoding='utf-8')
 
         # if task not exist yet.
         if (task := self.std_task.get(type, None)) is None:
@@ -211,38 +180,41 @@ class JobCommand(Job):
     def stop(self):
         super().stop()
 
-        async def _subprocess_stop(process):
+        async def _subprocess_stop():
             # make sure all std tasks are canceled.
-            if isinstance(process, asyncio.subprocess.Process):
-                try:
-                    process.kill()
-                except ProcessLookupError:
-                    pass
-                    # LOG.warning(
-                    #    f'Process Kill Exception, {traceback.format_exc()}')
-                except Exception:
-                    LOG.warning(
-                        f'Process Kill Exception, {traceback.format_exc()}')
+            tasks = self.std_task.values()
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
 
-            std_type = list(self.std_task.keys())
-            for k in std_type:
-                std_task = self.std_task.pop(k)
-                if not std_task.done():
-                    std_task.cancel()
+            task_loop = hub.TaskLoop(hub.app_hub.loop, tasks)
+            await task_loop.wait_tasks()
 
-        process = self.__process
-        self.__process = None
         self.stdin = None
         self.stderr = None
         self.stdout = None
-        self.connection = None
 
-        # if there is std task exist.
-        if self.std_task:
-            return hub.app_hub.spawn(_subprocess_stop, process)
-        else:
-            None
+        return hub.app_hub.spawn(_subprocess_stop)
 
     def __del__(self):
-        if self.command_running_task:
-            self.command_running_task.cancel()
+        self.stop()
+
+
+job = JobCommand('ping 8.8.8.8')
+task = job.run_job()
+
+hub.app_hub.joinall([task])
+
+"""
+   async def test_job():
+        self.install_job(JobCommand(
+            'ping 8.8.8.8'), '127.0.0.1')
+        self.install_job(JobCommand(
+            'ping 168.95.1.1'), '127.0.0.1')
+        self.install_job(JobCommand(
+            'ping 192.168.100.1'), '127.0.0.1')
+        await asyncio.sleep(3)
+        self.clear_job('127.0.0.1')
+
+app_hub.spawn(test_job)
+"""

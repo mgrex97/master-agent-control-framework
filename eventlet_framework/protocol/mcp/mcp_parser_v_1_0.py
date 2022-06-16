@@ -7,8 +7,7 @@ import logging
 
 from eventlet_framework.protocol.mcp.mcp_parser import MCPMsgBase
 
-LOG = logging.getLogger(
-    'eventlet_framwork.controller.mcp_controller.mcp_v_1_0')
+LOG = logging.getLogger('mcp_v_1_0')
 
 _MSG_PARSERS = {}
 
@@ -270,3 +269,9 @@ class MCPJobDeleteRequest(MCPMsgBase):
 
         msg_pack_into(mcproto.MCP_JOB_DELETE_REQUEST_STR,
                       self.buf, mcproto.MCP_HEADER_SIZE, self.job_id)
+
+
+@_register_parser
+@_set_msg_type(mcproto.MCP_JOB_DELETE_ALL)
+class MCPJobDeleteAll(MCPMsgBase):
+    pass

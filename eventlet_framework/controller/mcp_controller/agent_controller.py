@@ -21,11 +21,11 @@ The main component of Wiresahrk controller.
 
 """
 
+import asyncio
 import contextlib
 import logging
-import random
 import traceback
-from socket import socket
+from asyncio import CancelledError, StreamReader, StreamWriter
 from socket import IPPROTO_TCP
 from socket import TCP_NODELAY
 from socket import SHUT_WR
@@ -34,7 +34,6 @@ from eventlet_framework.controller.mcp_controller.mcp_controller import MachineC
 
 # from ryu import cfg
 from eventlet_framework.lib import hub
-from eventlet_framework.lib.hub import StreamClient
 
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(
@@ -42,40 +41,39 @@ LOG = logging.getLogger(
 
 
 class MachineControlAgentController(object):
-    def __init__(self):
-        self.tcp_connecting_port = 7930
-        self.connection_host = '169.254.0.111'
-        hub.spawn(self.attempt_connecting_loop, self.tcp_connecting_port)
+    def __init__(self, host='127.0.0.1', port=7930):
+        self.host = host
+        self.port = port
 
-    def __call__(self):
-        self.attempt_connecting_loop(self.tcp_connecting_port)
-
-    def attempt_connecting_loop(self, tcp_connecting_port, interval=None):
-        agent = StreamClient(
-            addr=(self.connection_host, tcp_connecting_port))
-        agent.connect_loop(machine_connection_factory, interval=2)
+    async def attempt_connecting_loop(self, interval=None):
+        agent = hub.StreamClient(
+            addr=(self.host, self.port))
+        await agent.connect_loop(machine_connection_factory, interval=interval)
 
 
 class AgentConnection(MachineConnection):
-    def __init__(self, socket, address, mcp_brick_name='mcp_agent_handler'):
+    def __init__(self, reader, writer, mcp_brick_name='mcp_agent_handler'):
         super(AgentConnection, self).__init__(
-            socket, address, mcp_brick_name=mcp_brick_name)
+            reader, writer, mcp_brick_name=mcp_brick_name)
 
 
-def machine_connection_factory(socket: socket, address):
-    LOG.debug('connected socket:%s address:%s port:%s',
-              socket, *socket.getpeername())
-    with contextlib.closing(AgentConnection(socket, address)) as machine_connection:
+async def machine_connection_factory(reader: StreamReader, writer: StreamWriter):
+    socket = writer.get_extra_info('socket')
+    address = socket.getpeername()
+    LOG.info('connected socket: address:%s port:%s',
+             *address)
+
+    with contextlib.closing(AgentConnection(reader, writer)) as machine_connection:
         try:
-            machine_connection.serve()
-
+            serve_task = hub.app_hub.spawn(machine_connection.serve)
+            await serve_task
         except Exception as e:
             # Something went wrong.
             # Especially malicious switch can send malformed packet,
             # the parser raise exception.
             # Can we do anything more graceful?
-            print(e)
-            # print(traceback.format_exc())
+            # print(e)
+            print(traceback.format_exc())
             """
             if datapath.id is None:
                 dpid_str = "%s" % datapath.id
@@ -85,4 +83,6 @@ def machine_connection_factory(socket: socket, address):
             raise
             """
         finally:
+            LOG.info(f'Disconnect to {address}')
+            serve_task.cancel()
             machine_connection.set_state(MC_DISCONNECT)

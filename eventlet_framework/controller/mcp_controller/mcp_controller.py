@@ -21,23 +21,25 @@ The main component of Wiresahrk controller.
 
 """
 
-import contextlib
 import logging
 import random
-from socket import socket
-from socket import IPPROTO_TCP
+import asyncio
+from asyncio import CancelledError, StreamWriter, StreamReader, Task
+from socket import IPPROTO_TCP, socket
 from socket import TCP_NODELAY
 from socket import SHUT_WR
 from socket import timeout as SocketTimeout
 import ssl
+
+from eventlet_framework.base.async_app_manager import BaseApp, lookup_service_brick
+from eventlet_framework.lib import hub
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.event import event
 
 # from ryu import cfg
-from eventlet_framework.lib import hub
 from eventlet_framework.lib import ip
-from eventlet_framework.base.app_manager import BaseApp, lookup_service_brick
+# from eventlet_framework.base.app_manager import BaseApp, lookup_service_brick
 from eventlet_framework.protocol.mcp import mcp_common, mcp_parser, mcp_v_1_0 as mcproto, mcp_parser_v_1_0 as mcproto_parser
 
 LOG = logging.getLogger(
@@ -77,12 +79,14 @@ def _split_addr(addr):
 
 
 def _deactivate(method):
-    def deactivate(self):
+    async def deactivate(self):
         try:
-            method(self)
+            await method(self)
         finally:
             try:
-                self.socket.close()
+                self.writer.close()
+                await self.writer.wait_closed()
+                # self.socket.close()
             except IOError:
                 pass
 
@@ -90,19 +94,17 @@ def _deactivate(method):
 
 
 class MachineConnection(object):
-    def __init__(self, socket: socket, address, mcp_brick_name):
-        self.socket = socket
+    def __init__(self, reader: StreamReader, writer: StreamWriter, mcp_brick_name):
+        self.socket: socket = writer.get_extra_info('socket')
+        self.address = writer.get_extra_info('peername')
         self.socket.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
-        self.socket.settimeout(10.0)
-        self.address = address
+        self.reader = reader
+        self.writer = writer
         self.is_active = True
 
         # The limit is arbitrary. We need to limit queue size to
         # prevent it from eating memory up.
-        self.send_q = hub.Queue(16)
-        self._send_q_sem = hub.BoundedSemaphore(self.send_q.maxsize)
-
-        self.unreplied_echo_requests = []
+        self.send_q = hub.Queue(1000)
 
         self.mcproto_parser = mcproto_parser
         self.mcproto = mcproto
@@ -143,75 +145,83 @@ class MachineConnection(object):
 
     @_deactivate
     def _recv_loop(self):
-        buf = bytearray()
-        min_read_len = remaining_read_len = mcp_common.MCP_HEADER_SIZE
+        async def _async_recv_loop():
+            buf = bytearray()
+            min_read_len = remaining_read_len = mcp_common.MCP_HEADER_SIZE
 
-        count = 0
+            count = 0
 
-        while self.state != MC_DISCONNECT:
-            try:
-                read_len = min_read_len
-                if remaining_read_len > min_read_len:
-                    read_len = remaining_read_len
-                ret = self.socket.recv(read_len)
-            except SocketTimeout:
-                LOG.warning('Socket timeout.')
-                continue
-            except ssl.SSLError:
-                # eventlet throws SSLError (which is a subclass of IOError)
-                # on SSL socket read timeout; re-try the loop in this case.
-                continue
-            except (EOFError, IOError):
-                break
+            while self.state != MC_DISCONNECT:
+                try:
+                    read_len = min_read_len
+                    if read_len > remaining_read_len:
+                        read_len = remaining_read_len
 
-            if not ret:
-                break
-
-            buf += ret
-            buf_len = len(buf)
-
-            while buf_len >= min_read_len:
-                (msg_type, msg_len, xid) = mcp_parser.header(buf)
-                if msg_len < min_read_len:
-                    # Someone isn't playing nicely; log it, and try something sane.
-                    LOG.debug("Message with invalid length %s received from Machine at address %s",
-                              msg_len, self.address)
-                    msg_len = min_read_len
-                if buf_len < msg_len:
-                    remaining_read_len = (msg_len - buf_len)
+                    ret = await self.reader.readexactly(read_len)
+                except SocketTimeout:
+                    LOG.warning('Socket timeout.')
+                    continue
+                except ssl.SSLError:
+                    # eventlet throws SSLError (which is a subclass of IOError)
+                    # on SSL socket read timeout; re-try the loop in this case.
+                    continue
+                except (EOFError, IOError):
                     break
 
-                msg = mcp_parser.msg(
-                    self, msg_type, msg_len, xid, buf[:msg_len])
+                if not ret:
+                    break
 
-                if msg:
-                    # decode event and create event
-                    ev = mcp_event.mcp_msg_to_ev(msg)
-                    if self.mcp_brick is not None:
-                        # send event to observers and self event handlers
-                        self.mcp_brick.send_event_to_observers(ev, self.state)
-                        handlers = self.mcp_brick.get_handlers(ev, self.state)
-
-                        for handler in handlers:
-                            handler(ev)
-
-                buf = buf[msg_len:]
+                buf += ret
                 buf_len = len(buf)
-                remaining_read_len = min_read_len
 
-                count += 1
-                if count > 2048:
-                    count = 0
-                    hub.sleep(0)
+                while buf_len >= min_read_len:
+                    (msg_type, msg_len, xid) = mcp_parser.header(buf)
+                    if msg_len < min_read_len:
+                        # Someone isn't playing nicely; log it, and try something sane.
+                        LOG.debug("Message with invalid length %s received from Machine at address %s",
+                                  msg_len, self.address)
+                        msg_len = min_read_len
+                    if buf_len < msg_len:
+                        remaining_read_len = (msg_len - buf_len)
+                        break
 
-    def _send_loop(self):
+                    msg = mcp_parser.msg(
+                        self, msg_type, msg_len, xid, buf[:msg_len])
+
+                    if msg:
+                        # decode event and create event
+                        ev = mcp_event.mcp_msg_to_ev(msg)
+                        if self.mcp_brick is not None:
+                            # send event to observers and self event handlers
+                            self.mcp_brick.send_event_to_observers(
+                                ev, self.state)
+                            handlers = self.mcp_brick.get_handlers(
+                                ev, self.state)
+
+                            for handler in handlers:
+                                handler(ev)
+
+                    buf = buf[msg_len:]
+                    buf_len = len(buf)
+                    remaining_read_len = min_read_len
+
+                    count += 1
+                    if count > 2048:
+                        count = 0
+                        await asyncio.sleep(0)
+
+        return hub.app_hub.spawn(_async_recv_loop)
+
+    async def _send_loop(self):
         try:
             while self.state != MC_DISCONNECT:
-                buf, close_socket = self.send_q.get()
-                self._send_q_sem.release()
-                self.socket.sendall(buf)
+                buf, close_socket = await self.send_q.get()
+                self.writer.write(buf)
+                await self.writer.drain()
                 if close_socket:
                     break
+        except CancelledError:
+            LOG.debug("Stop _send_loop at address %s", self.address)
         except SocketTimeout:
             LOG.debug("Socket timed out while sending data to switch at address %s",
                       self.address)
@@ -222,30 +232,33 @@ class MachineConnection(object):
                       self.address, errno, ioe.strerror)
         finally:
             q = self.send_q
-            # First, clear self.send_q to prevent new references.
             self.send_q = None
+            # First, clear self.send_q to prevent new references.
             # Now, drain the send_q, releasing the associated semaphore for each entry.
             # This should release all threads waiting to acquire the semaphore.
             try:
-                while q.get(block=False):
-                    self._send_q_sem.release()
-            except hub.QueueEmpty:
+                # clean queue
+                while q.get_nowait():
+                    pass
+            except asyncio.QueueEmpty:
                 pass
             # Finally, disallow further sends.
             self._close_write()
 
-    def send(self, buf, close_socket=False):
-        msg_enqueued = False
-        self._send_q_sem.acquire()
-        if self.send_q:
-            self.send_q.put((buf, close_socket))
-            msg_enqueued = True
-        else:
-            self._send_q_sem.release()
-        if not msg_enqueued:
-            LOG.debug('Machine Connection in process of terminating; send() to %s discarded.',
-                      self.address)
-        return msg_enqueued
+    def send(self, buf, close_socket=False) -> Task:
+        async def _send(buf, close_socket):
+            msg_enqueued = False
+            if self.send_q:
+                await self.send_q.put((buf, close_socket))
+                msg_enqueued = True
+
+            if not msg_enqueued:
+                LOG.debug('Machine Connection in process of terminating; send() to %s discarded.',
+                          self.address)
+
+            return msg_enqueued
+
+        return hub.app_hub.spawn(_send, buf, close_socket)
 
     def set_xid(self, msg: mcproto_parser.MCPMsgBase):
         self.xid += 1
@@ -253,31 +266,40 @@ class MachineConnection(object):
         msg.set_xid(self.xid)
         return self.xid
 
-    def send_msg(self, msg, close_socket=False):
-        assert isinstance(msg, self.mcproto_parser.MCPMsgBase)
-        if msg.xid is None:
-            self.set_xid(msg)
-        msg.serialize()
-        # LOG.debug('send_msg %s', msg)
-        return self.send(msg.buf, close_socket=close_socket)
+    def send_msg(self, msg, close_socket=False) -> Task:
+        async def _send_msg(msg, close_socket):
+            assert isinstance(msg, self.mcproto_parser.MCPMsgBase)
+            if msg.xid is None:
+                self.set_xid(msg)
+            msg.serialize()
+            LOG.debug('send_msg %s', msg)
+            return await self.send(msg.buf, close_socket=close_socket)
+        return hub.app_hub.spawn(_send_msg, msg, close_socket)
 
-    def serve(self):
-        send_thr = hub.spawn(self._send_loop)
+    async def serve(self):
+        send_loop_task = hub.app_hub.spawn(self._send_loop)
 
         # send connection event
         connect_ev = event.EventSocketConnecting(self)
 
+        if self.mcp_brick is not None:
+            self.mcp_brick.send_event_to_observers(connect_ev)
+            handlers = self.mcp_brick.get_handlers(
+                connect_ev, MC_HANDSHAK)
+
+            for handler in handlers:
+                handler(connect_ev)
+
         # send socket connecting event
-        self.mcp_brick.send_event_to_observers(connect_ev)
-        handlers = self.mcp_brick.get_handlers(
-            connect_ev, MC_HANDSHAK)
-
-        for handler in handlers:
-            handler(connect_ev)
-
+        exception = None
         try:
-            self._recv_loop()
+            recv_loop_task = hub.app_hub.spawn(self._recv_loop)
+            await recv_loop_task
+        except Exception as e:
+            exception = e
         finally:
-            hub.kill(send_thr)
-            hub.joinall([send_thr])
+            hub.app_hub.kill(send_loop_task)
+            hub.app_hub.kill(recv_loop_task)
             self.is_active = False
+            if exception is not None:
+                raise exception

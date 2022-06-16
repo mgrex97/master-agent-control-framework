@@ -1,35 +1,29 @@
-import contextlib
-from eventlet_framework.controller.mcp_controller.mcp_controller import MachineConnection
-from eventlet_framework.lib.hub import StreamServer
-from eventlet_framework.lib import hub
-from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
-from socket import SHUT_WR
 from socket import TCP_NODELAY
 from socket import IPPROTO_TCP
-from socket import socket
 import traceback
 import logging
+import contextlib
+from asyncio import CancelledError, StreamWriter, StreamReader
 
-# from ryu import cfg
+from eventlet_framework.controller.mcp_controller.mcp_controller import MachineConnection
+from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
+from eventlet_framework.lib import hub
+from eventlet_framework.lib.hub import app_hub
 
 LOG = logging.getLogger(
     'eventlent_framework.controller.mcp_controller.master_controller')
 
 
 class MachineControlMasterController(object):
-    def __init__(self):
-        self.tcp_listen_port = 7930
-        self.listen_host = '169.254.0.111'
-        hub.spawn(self.server_loop, self.tcp_listen_port)
+    def __init__(self, listen_host='127.0.0.1', listen_port=7930):
+        self.listen_host = listen_host
+        self.listen_port = listen_port
         self._clients = {}
 
-    def __call__(self):
-        self.server_loop(self.tcp_listen_port)
-
-    def server_loop(self, tshark_tcp_listen_port):
-        server = StreamServer(
-            (self.listen_host, tshark_tcp_listen_port), machine_connection_factory)
-        server.serve_forever()
+    async def server_loop(self):
+        server = hub.StreamServer(
+            (self.listen_host, self.listen_port), machine_connection_factory)
+        await server.serve_forever()
 
 
 class MasterConnection(MachineConnection):
@@ -45,36 +39,40 @@ class MasterConnection(MachineConnection):
         self.machine_id = self.machine_id + 1
         return m_id
 
-    def serve(self):
+    async def serve(self):
         if self.id == 0:
             self.id = self._get_new_machine_id()
 
         msg_hello = self.mcproto_parser.MCPHello(self, self.id)
 
-        self.send_msg(msg_hello)
-        return super().serve()
+        await self.send_msg(msg_hello)
+        await super().serve()
 
 
-def machine_connection_factory(socket: socket, address):
-    LOG.debug('connected socket:%s address:%s port:%s',
-              socket, *socket.getpeername())
-    with contextlib.closing(MasterConnection(socket, address)) as machine_connection:
+async def machine_connection_factory(reader: StreamReader, writer: StreamWriter):
+    socket = writer.get_extra_info('socket')
+    address = socket.getpeername()
+    LOG.info('connected socket: address:%s port:%s',
+             *address)
+    with contextlib.closing(MasterConnection(reader, writer)) as machine_connection:
         try:
-            machine_connection.serve()
+            connection_serve = app_hub.spawn(machine_connection.serve)
+            await connection_serve
         except Exception as e:
             # Something went wrong.
             # Especially malicious switch can send malformed packet,
             # the parser raise exception.
             # Can we do anything more graceful?
-            print(e)
-            print(traceback.format_exc())
-            """
-            if datapath.id is None:
-                dpid_str = "%s" % datapath.id
+            # print(e)
+            if machine_connection.id is None:
+                dpid_str = "(id not been set yet)"
             else:
-                dpid_str = dpid_to_str(datapath.id)
-            LOG.error("Error in the datapath %s from %s", dpid_str, address)
-            raise
-            """
+                dpid_str = str(machine_connection.id)
+            LOG.error("Error in the datapath %s from %s:%s\nError Detail: %s",
+                      dpid_str, *address, traceback.format_exc())
+        except CancelledError:
+            LOG.info("Connection cancel.")
         finally:
+            LOG.info(f"Connection from {address[0]}:{address[1]} disconnect.")
+            connection_serve.cancel()
             machine_connection.set_state(MC_DISCONNECT)
