@@ -1,7 +1,7 @@
 
 from async_util import print_loop_stack
 from eventlet_framework.lib.hub import TaskLoop, app_hub
-from eventlet_framework.base.async_app_manager import AppManager, SERVICE_BRICKS
+from eventlet_framework.base.app_manager import AppManager, SERVICE_BRICKS
 import logging
 
 

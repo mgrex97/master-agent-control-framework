@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from custom_app.job_app.job_class import JOB_ASYNC, Job
-from eventlet_framework.base.async_app_manager import BaseApp
+from eventlet_framework.base.app_manager import BaseApp
 from eventlet_framework.event import event
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.controller.handler import observe_event

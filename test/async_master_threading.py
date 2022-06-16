@@ -2,7 +2,7 @@ import time
 import asyncio
 import logging
 
-from eventlet_framework.base.async_app_manager import AppManager, SERVICE_BRICKS
+from eventlet_framework.base.app_manager import AppManager, SERVICE_BRICKS
 from eventlet_framework.lib.hub import Hub, TaskLoop, app_hub
 from async_util import print_loop_stack
 

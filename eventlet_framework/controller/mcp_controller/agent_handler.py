@@ -1,5 +1,5 @@
 import logging
-from eventlet_framework.base.async_app_manager import BaseApp
+from eventlet_framework.base.app_manager import BaseApp
 from eventlet_framework.lib.hub import app_hub
 from eventlet_framework.event import event
 from eventlet_framework.event.mcp_event import mcp_event

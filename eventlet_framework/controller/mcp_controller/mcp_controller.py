@@ -31,7 +31,7 @@ from socket import SHUT_WR
 from socket import timeout as SocketTimeout
 import ssl
 
-from eventlet_framework.base.async_app_manager import BaseApp, lookup_service_brick
+from eventlet_framework.base.app_manager import BaseApp, lookup_service_brick
 from eventlet_framework.lib import hub
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
 from eventlet_framework.event.mcp_event import mcp_event
