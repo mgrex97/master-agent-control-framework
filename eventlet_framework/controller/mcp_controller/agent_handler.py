@@ -5,7 +5,7 @@ from eventlet_framework.event import event
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.controller.handler import observe_event, observe_event_from_self
 from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK, MC_STABLE
-from eventlet_framework.controller.mcp_controller.async_ver.agent_controller import MachineControlAgentController
+from eventlet_framework.controller.mcp_controller.agent_controller import MachineControlAgentController
 
 LOG = logging.getLogger(
     'eventlent_framework.controller.mcp_controller.agent_controller')

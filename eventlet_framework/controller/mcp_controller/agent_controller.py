@@ -29,8 +29,8 @@ from asyncio import CancelledError, StreamReader, StreamWriter
 from socket import IPPROTO_TCP
 from socket import TCP_NODELAY
 from socket import SHUT_WR
-from eventlet_framework.controller.mcp_controller.async_ver.mcp_state import MC_DISCONNECT, MC_HANDSHAK
-from eventlet_framework.controller.mcp_controller.async_ver.mcp_controller import MachineConnection
+from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
+from eventlet_framework.controller.mcp_controller.mcp_controller import MachineConnection
 
 # from ryu import cfg
 from eventlet_framework.lib import hub

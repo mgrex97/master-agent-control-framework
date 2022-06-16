@@ -12,7 +12,7 @@ async def application_init_and_run():
     logger = logging.getLogger(__name__)
     app_mgr = AppManager.get_instance()
     app_mgr.load_apps([
-        'custom_app.job_app.async_job_app.job_agent_handler'
+        'custom_app.job_app.job_agent_handler'
     ])
 
     contexts = app_mgr.create_contexts()

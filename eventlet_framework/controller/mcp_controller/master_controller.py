@@ -5,8 +5,8 @@ import logging
 import contextlib
 from asyncio import CancelledError, StreamWriter, StreamReader
 
-from eventlet_framework.controller.mcp_controller.async_ver.mcp_controller import MachineConnection
-from eventlet_framework.controller.mcp_controller.async_ver.mcp_state import MC_DISCONNECT, MC_HANDSHAK
+from eventlet_framework.controller.mcp_controller.mcp_controller import MachineConnection
+from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
 from eventlet_framework.lib import hub
 from eventlet_framework.lib.hub import app_hub
 

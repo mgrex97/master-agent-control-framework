@@ -3,7 +3,7 @@ import json
 import asyncio
 import traceback
 from eventlet_framework.lib import hub
-from eventlet_framework.controller.mcp_controller.async_ver.mcp_controller import MachineConnection
+from eventlet_framework.controller.mcp_controller.mcp_controller import MachineConnection
 from pprint import pprint
 
 # job state

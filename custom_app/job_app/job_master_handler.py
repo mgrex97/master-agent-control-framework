@@ -2,15 +2,15 @@ import asyncio
 import logging
 from eventlet_framework.lib import hub
 from eventlet_framework.lib.hub import app_hub
-from custom_app.job_app.async_job_app.job_class import JOB_ASYNC, JOB_CREATE_FAILD, JOB_DELETE, JOB_RUNING, Job, JobCommand
+from custom_app.job_app.job_class import JOB_ASYNC, JOB_CREATE_FAILD, JOB_DELETE, JOB_RUNING, Job, JobCommand
 from eventlet_framework.base.async_app_manager import BaseApp
 from eventlet_framework.event.mcp_event import mcp_event
 from eventlet_framework.controller.handler import observe_event
-from eventlet_framework.controller.mcp_controller.async_ver.mcp_state import MC_STABLE
-from custom_app.job_app.async_job_app.job_manager import JobManager
+from eventlet_framework.controller.mcp_controller.mcp_state import MC_STABLE
+from custom_app.job_app.job_manager import JobManager
 
 _REQUIRED_APP = [
-    'eventlet_framework.controller.mcp_controller.async_ver.master_handler']
+    'eventlet_framework.controller.mcp_controller.master_handler']
 
 LOG = logging.getLogger('custom_app.job_app.jog_master_handler')
 

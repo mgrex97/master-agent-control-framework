@@ -1,5 +1,5 @@
 import asyncio
-from eventlet_framework.controller.mcp_controller.async_ver.master_controller import MachineControlMasterController
+from eventlet_framework.controller.mcp_controller.master_controller import MachineControlMasterController
 from eventlet_framework.lib import hub
 from eventlet_framework.lib.hub import app_hub
 from async_util import print_loop_stack

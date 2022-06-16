@@ -12,8 +12,8 @@ async def application_init_and_run():
     logger = logging.getLogger(__name__)
     app_mgr = AppManager.get_instance()
     app_mgr.load_apps([
-        # 'eventlet_framework.controller.mcp_controller.async_ver.master_handler',
-        'custom_app.job_app.async_job_app.job_master_handler'
+        # 'eventlet_framework.controller.mcp_controller.master_handler',
+        'custom_app.job_app.job_master_handler'
     ])
 
     contexts = app_mgr.create_contexts()
