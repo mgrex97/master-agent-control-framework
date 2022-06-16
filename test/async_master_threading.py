@@ -1,18 +1,17 @@
+import time
 import asyncio
 import logging
+
 from eventlet_framework.base.async_app_manager import AppManager, SERVICE_BRICKS
-from eventlet_framework.lib.async_hub import TaskLoop, app_hub
+from eventlet_framework.lib.async_hub import Hub, TaskLoop, app_hub
 from async_util import print_loop_stack
 
 from concurrent.futures import ThreadPoolExecutor
 
 
-async def application_init_and_run():
-    app_hub.setup_eventloop()
-
+async def application_init_and_run(app_mgr: AppManager):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    app_mgr = AppManager.get_instance()
     app_mgr.load_apps([
         # 'eventlet_framework.controller.mcp_controller.async_ver.master_handler',
         'custom_app.job_app.async_job_app.job_master_handler'
@@ -35,10 +34,26 @@ async def application_init_and_run():
         pass
         await app_mgr.close()
 
-task = app_hub.spawn(application_init_and_run)
-app_hub.joinall([task])
+
+def app_thread_entrance(app_mgr):
+    app_hub.setup_eventloop()
+    task = app_hub.spawn(application_init_and_run, app_mgr)
+    app_hub.joinall([task])
+    app_hub.joinall()
 
 
-with ThreadPoolExecutor(max_workers=1) as executor:
-    future = executor.submit(pow, 323, 1235)
-    print(future.result())
+async def test():
+    for i in range(10):
+        print(10)
+        await asyncio.sleep(1)
+
+if __name__ == '__main__':
+    app_mgr = AppManager.get_instance()
+
+    hub = Hub()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future = executor.submit(app_thread_entrance, app_mgr)
+        hub.setup_eventloop()
+        task = hub.spawn(test)
+        hub.joinall([task])
