@@ -3,8 +3,8 @@ import struct
 import base64
 import logging
 
-from eventlet_framework.lib import stringify
-from eventlet_framework.protocol.mcp.mcp_common import MCP_HEADER_PACK_STR, MCP_HEADER_SIZE
+from async_app_fw.lib import stringify
+from async_app_fw.protocol.mcp.mcp_common import MCP_HEADER_PACK_STR, MCP_HEADER_SIZE
 
 LOG = logging.getLogger(
     'eventlet_framwork.controller.mcp_controller.mcp_parser')

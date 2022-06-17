@@ -1,5 +1,5 @@
 import asyncio
-from eventlet_framework.lib.hub import app_hub, TaskLoop
+from async_app_fw.lib.hub import app_hub, TaskLoop
 
 
 async def test(n, x):

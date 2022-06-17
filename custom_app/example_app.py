@@ -1,7 +1,7 @@
-from eventlet_framework.base.app_manager import BaseApp
-from eventlet_framework.controller.handler import observe_event
-from eventlet_framework.event.tshark_event import tshark_event
-from eventlet_framework.event.tshark_event.tshark_event import EventRstpPacketIn
+from async_app_fw.base.app_manager import BaseApp
+from async_app_fw.controller.handler import observe_event
+from async_app_fw.event.tshark_event import tshark_event
+from async_app_fw.event.tshark_event.tshark_event import EventRstpPacketIn
 
 from product.QSW.resource.qsw_environment import QSWEnvironment
 

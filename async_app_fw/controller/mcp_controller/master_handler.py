@@ -1,11 +1,11 @@
 import logging
-from eventlet_framework.controller.handler import observe_event, observe_event_from_self
-from eventlet_framework.base.app_manager import BaseApp
-from eventlet_framework.controller.mcp_controller.master_controller import MachineControlMasterController
-from eventlet_framework.lib.hub import app_hub
-from eventlet_framework.event.mcp_event import mcp_event
-from eventlet_framework.event import event
-from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_FEATURE, MC_HANDSHAK, MC_STABLE
+from async_app_fw.controller.handler import observe_event, observe_event_from_self
+from async_app_fw.base.app_manager import BaseApp
+from async_app_fw.controller.mcp_controller.master_controller import MachineControlMasterController
+from async_app_fw.lib.hub import app_hub
+from async_app_fw.event.mcp_event import mcp_event
+from async_app_fw.event import event
+from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_FEATURE, MC_HANDSHAK, MC_STABLE
 
 LOG = logging.getLogger(
     'eventlent_framework.controller.mcp_controller.agent_controller')

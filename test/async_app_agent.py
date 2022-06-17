@@ -1,7 +1,7 @@
 
 from async_util import print_loop_stack
-from eventlet_framework.lib.hub import TaskLoop, app_hub
-from eventlet_framework.base.app_manager import AppManager, SERVICE_BRICKS
+from async_app_fw.lib.hub import TaskLoop, app_hub
+from async_app_fw.base.app_manager import AppManager, SERVICE_BRICKS
 import logging
 
 
@@ -12,7 +12,7 @@ async def application_init_and_run():
     logger = logging.getLogger(__name__)
     app_mgr = AppManager.get_instance()
     app_mgr.load_apps([
-        'eventlet_framework.controller.mcp_controller.agent_handler'
+        'async_app_fw.controller.mcp_controller.agent_handler'
     ])
 
     contexts = app_mgr.create_contexts()

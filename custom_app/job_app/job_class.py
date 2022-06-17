@@ -2,8 +2,8 @@ import logging
 import json
 import asyncio
 import traceback
-from eventlet_framework.lib import hub
-from eventlet_framework.controller.mcp_controller.mcp_controller import MachineConnection
+from async_app_fw.lib import hub
+from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
 from pprint import pprint
 
 # job state

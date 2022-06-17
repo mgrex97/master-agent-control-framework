@@ -1,11 +1,11 @@
 import json
 import struct
-from eventlet_framework.protocol.mcp import mcp_v_1_0 as mcproto
-from eventlet_framework.lib.pack_utils import msg_pack_into
-from eventlet_framework.protocol.mcp import mcp_parser
+from async_app_fw.protocol.mcp import mcp_v_1_0 as mcproto
+from async_app_fw.lib.pack_utils import msg_pack_into
+from async_app_fw.protocol.mcp import mcp_parser
 import logging
 
-from eventlet_framework.protocol.mcp.mcp_parser import MCPMsgBase
+from async_app_fw.protocol.mcp.mcp_parser import MCPMsgBase
 
 LOG = logging.getLogger('mcp_v_1_0')
 

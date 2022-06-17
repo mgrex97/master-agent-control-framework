@@ -18,7 +18,7 @@ import inspect
 import logging
 import sys
 
-LOG = logging.getLogger('eventlet_framework.controller.handler')
+LOG = logging.getLogger('async_app_fw.controller.handler')
 
 # just represent OF datapath state. datapath specific so should be moved.
 

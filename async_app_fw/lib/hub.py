@@ -4,9 +4,9 @@ import os
 import inspect
 import socket
 import threading
-from eventlet_framework.lib import ip
+from async_app_fw.lib import ip
 from signal import SIGINT
-from eventlet_framework.utils import _listify
+from async_app_fw.utils import _listify
 
 
 class SpawnFailed(Exception):

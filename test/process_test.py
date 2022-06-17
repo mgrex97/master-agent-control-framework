@@ -1,7 +1,7 @@
 import logging
 import json
 import asyncio
-from eventlet_framework.lib import hub
+from async_app_fw.lib import hub
 from pprint import pprint
 
 # job state

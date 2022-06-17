@@ -4,15 +4,15 @@ import itertools
 import logging
 import gc
 
-from eventlet_framework.controller.handler import register_instance, get_dependent_services
-from eventlet_framework.event import event
-from eventlet_framework.event.event import EventReplyBase, EventRequestBase
-from eventlet_framework.lib import hub
-from eventlet_framework.lib.hub import TaskLoop, app_hub
-from eventlet_framework import utils
-from eventlet_framework.utils import _listify
+from async_app_fw.controller.handler import register_instance, get_dependent_services
+from async_app_fw.event import event
+from async_app_fw.event.event import EventReplyBase, EventRequestBase
+from async_app_fw.lib import hub
+from async_app_fw.lib.hub import TaskLoop, app_hub
+from async_app_fw import utils
+from async_app_fw.utils import _listify
 
-LOG = logging.getLogger('eventlet_framework.base.app_manager')
+LOG = logging.getLogger('async_app_fw.base.app_manager')
 
 SERVICE_BRICKS = {}
 

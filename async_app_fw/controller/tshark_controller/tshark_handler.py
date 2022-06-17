@@ -1,13 +1,13 @@
 from datetime import datetime
 import logging
 
-import eventlet_framework.base.app_manager
-from eventlet_framework.controller.tshark_controller.tshark_controller import TsharkController
+import async_app_fw.base.app_manager
+from async_app_fw.controller.tshark_controller.tshark_controller import TsharkController
 
-from eventlet_framework.lib import hub
-from eventlet_framework.event.tshark_event import tshark_event
-from eventlet_framework.controller.handler import observe_event
-from eventlet_framework.cfg import CONF
+from async_app_fw.lib import hub
+from async_app_fw.event.tshark_event import tshark_event
+from async_app_fw.controller.handler import observe_event
+from async_app_fw.cfg import CONF
 
 LOG = logging.getLogger(
     'eventlent_framework.controller.tshark.tshark_controller')
@@ -20,7 +20,7 @@ def check_packet_delay(packet):
         f"Current time: {now_time}, Packet time: {packet.sniff_time}, Delay: {delay}")
 
 
-class RemoteTsharkHandler(eventlet_framework.base.app_manager.BaseApp):
+class RemoteTsharkHandler(async_app_fw.base.app_manager.BaseApp):
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
         self.name = tshark_event.NAME

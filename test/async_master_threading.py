@@ -2,8 +2,8 @@ import time
 import asyncio
 import logging
 
-from eventlet_framework.base.app_manager import AppManager, SERVICE_BRICKS
-from eventlet_framework.lib.hub import Hub, TaskLoop, app_hub
+from async_app_fw.base.app_manager import AppManager, SERVICE_BRICKS
+from async_app_fw.lib.hub import Hub, TaskLoop, app_hub
 from async_util import print_loop_stack
 
 from concurrent.futures import ThreadPoolExecutor
@@ -13,7 +13,7 @@ async def application_init_and_run(app_mgr: AppManager):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     app_mgr.load_apps([
-        # 'eventlet_framework.controller.mcp_controller.master_handler',
+        # 'async_app_fw.controller.mcp_controller.master_handler',
         'custom_app.job_app.job_master_handler'
     ])
 

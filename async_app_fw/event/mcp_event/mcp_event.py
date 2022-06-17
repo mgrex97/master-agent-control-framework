@@ -1,8 +1,8 @@
 import time
 import inspect
 import logging
-from eventlet_framework.event import event
-from eventlet_framework.protocol.mcp import mcp_parser_v_1_0
+from async_app_fw.event import event
+from async_app_fw.protocol.mcp import mcp_parser_v_1_0
 
 
 class EventMCPMsgBase(event.EventBase):

@@ -1,7 +1,7 @@
 import asyncio
-from eventlet_framework.controller.mcp_controller.master_controller import MachineControlMasterController
-from eventlet_framework.lib import hub
-from eventlet_framework.lib.hub import app_hub
+from async_app_fw.controller.mcp_controller.master_controller import MachineControlMasterController
+from async_app_fw.lib import hub
+from async_app_fw.lib.hub import app_hub
 from async_util import print_loop_stack
 
 if __name__ == '__main__':

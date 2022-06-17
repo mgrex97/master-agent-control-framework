@@ -31,16 +31,16 @@ from socket import SHUT_WR
 from socket import timeout as SocketTimeout
 import ssl
 
-from eventlet_framework.base.app_manager import BaseApp, lookup_service_brick
-from eventlet_framework.lib import hub
-from eventlet_framework.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
-from eventlet_framework.event.mcp_event import mcp_event
-from eventlet_framework.event import event
+from async_app_fw.base.app_manager import BaseApp, lookup_service_brick
+from async_app_fw.lib import hub
+from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_HANDSHAK
+from async_app_fw.event.mcp_event import mcp_event
+from async_app_fw.event import event
 
 # from ryu import cfg
-from eventlet_framework.lib import ip
-# from eventlet_framework.base.app_manager import BaseApp, lookup_service_brick
-from eventlet_framework.protocol.mcp import mcp_common, mcp_parser, mcp_v_1_0 as mcproto, mcp_parser_v_1_0 as mcproto_parser
+from async_app_fw.lib import ip
+# from async_app_fw.base.app_manager import BaseApp, lookup_service_brick
+from async_app_fw.protocol.mcp import mcp_common, mcp_parser, mcp_v_1_0 as mcproto, mcp_parser_v_1_0 as mcproto_parser
 
 LOG = logging.getLogger(
     'eventlent_framework.controller.controller.mcp_controller')

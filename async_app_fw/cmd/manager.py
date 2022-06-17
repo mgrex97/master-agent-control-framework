@@ -1,7 +1,7 @@
 import logging
-from eventlet_framework.base.app_manager import AppManager
-from eventlet_framework.lib import hub
-from eventlet_framework.cfg import CONF
+from async_app_fw.base.app_manager import AppManager
+from async_app_fw.lib import hub
+from async_app_fw.cfg import CONF
 
 
 def main():
@@ -9,8 +9,8 @@ def main():
     logger = logging.getLogger(__name__)
     app_mgr = AppManager.get_instance()
     app_mgr.load_apps(
-        ['eventlet_framework.controller.mcp_controller.mcp_handler'])
-    # ['eventlet_framework.controller.tshark_controller.tshark_handler', 'evetlet_framwork.controller.mcp_controller.mcp_handler'])
+        ['async_app_fw.controller.mcp_controller.mcp_handler'])
+    # ['async_app_fw.controller.tshark_controller.tshark_handler', 'evetlet_framwork.controller.mcp_controller.mcp_handler'])
 
     contexts = app_mgr.create_contexts()
 

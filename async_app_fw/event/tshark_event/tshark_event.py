@@ -2,10 +2,10 @@ import logging
 import time
 import os
 
-from eventlet_framework.event import event
+from async_app_fw.event import event
 from pyshark.packet.packet import Packet
 
-from eventlet_framework.controller import handler
+from async_app_fw.controller import handler
 from pyshark.tshark.tshark_json import packet_from_json_packet
 
 NAME = 'tshark_event'
@@ -60,4 +60,4 @@ def tshark_packet_to_ev_cls(json_string, address):
 
 
 handler.register_service(
-    'eventlet_framework.controller.tshark_controller.tshark_handler')
+    'async_app_fw.controller.tshark_controller.tshark_handler')

@@ -1,9 +1,9 @@
 import logging
 from queue import Empty
-from eventlet_framework.controller.mcp_controller.mcp_controller import MachineConnection
+from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
 from custom_app.job_app.job_class import JOB_ASYNC, JOB_DELETE, Job
-from eventlet_framework.lib import hub
-from eventlet_framework.lib.hub import TaskLoop, app_hub
+from async_app_fw.lib import hub
+from async_app_fw.lib.hub import TaskLoop, app_hub
 
 
 LOG = logging.getLogger('custom_app.job_app.job_manager')
