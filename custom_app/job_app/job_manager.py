@@ -9,53 +9,6 @@ from async_app_fw.lib.hub import TaskLoop, app_hub
 LOG = logging.getLogger('custom_app.job_app.job_manager')
 
 
-"""
-class ThreadCommunicateQueue:
-    def __init__(self):
-        self.q_send = hub.Queue(maxsize=1)
-        self.q_back = hub.Queue(maxsize=1)
-
-    def send(self, item, block=False):
-        self.q_send.put(item, block=block)
-
-    def send_back(self, item, block=False):
-        self.q_back.put(item, block=block)
-
-    def wait_send(self):
-        while True:
-            try:
-                item = self.q_send.get(block=False)
-                LOG.info(f'Get item from Queue. Item {item}')
-                return item
-            except Empty:
-                hub.sleep(0.1)
-
-    def wait_back(self):
-        while True:
-            try:
-                item = self.q_back.get(block=False)
-                LOG.info(f'Get item from Queue. Item {item}')
-                return item
-            except Empty:
-                hub.sleep(0.1)
-
-
-class JobCreateComm(ThreadCommunicateQueue):
-    def __init__(self):
-        self.q_send = hub.Queue(maxsize=1)
-        self.q_back = hub.Queue(maxsize=1)
-        self.check = False
-
-    def set_xid(self, xid):
-        self.xid = xid
-        self.check = False
-
-    def send_back(self, item, block=False):
-        self.check = True
-        return super().send_back(item, block)
-"""
-
-
 class JobManager:
     def __init__(self, connection=None):
         self.connection = connection
