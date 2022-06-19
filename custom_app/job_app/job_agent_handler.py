@@ -12,13 +12,15 @@ from async_app_fw.lib.hub import TaskLoop, app_hub
 _REQUIRED_APP = [
     'async_app_fw.controller.mcp_controller.agent_handler']
 
+APP_NAME_JobAgentHandler = 'job_agent_handler'
+
 
 class JobAgentHandler(BaseApp):
     LOG = logging.getLogger('Job Agent Handler')
 
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
-        self.name = 'job_agent_handler'
+        self.name = APP_NAME_JobAgentHandler
         self.job_manager: JobManager = JobManager()
         self.connection = None
         self.job_clear_task_loop = None
