@@ -6,6 +6,7 @@ from async_app_fw.event import event
 from async_app_fw.event.mcp_event import mcp_event
 from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
+from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
 from custom_app.job_app.job_manager import JobManager
 from async_app_fw.lib.hub import TaskLoop, app_hub
 
@@ -56,11 +57,11 @@ class JobAgentHandler(BaseApp):
         msg.xid = xid
         conn.send_msg(msg)
 
-    @observe_event(mcp_event.EventMCPJobACK, MC_STABLE)
-    def job_ack_hanlder(self, ev):
+    @observe_event(mcp_event.EventMCPJobStateChange, MC_STABLE)
+    def job_state_change_hanlder(self, ev):
+        msg: MCPJobStateChange = ev.msg
         job: Job = self.job_manager.get_job(ev.msg.job_id)
-        job.change_state(JOB_ASYNC)
-        job.run_job()
+        job.change_state(msg.before, msg.after, msg.info)
 
     @observe_event(mcp_event.EventMCPJobDeleteRequest, MC_STABLE)
     def job_delete_request_hanlder(self, ev):
