@@ -34,8 +34,10 @@ class JobManager:
         assert job_id not in self.jobs
         job: Job = self.job_request.get(xid, None)
         assert job is not None
+        # update job id
+        job.id = job_id
         self.jobs[job_id] = job
-        job.change_state(JOB_ASYNC)
+        job.change_state(JOB_CREATE)
 
     def del_job(self, job_id):
         self.jobs[job_id].change_state(JOB_DELETE)
