@@ -68,7 +68,6 @@ class JobCommand(Job):
             self.stdin = self.__process.stdin
             self.stdout = self.__process.stdout
             self.stderr = self.__process.stderr
-            self.state = True
             self.read_stdout()
             # wait std read task end
             task_loop = hub.TaskLoop(
