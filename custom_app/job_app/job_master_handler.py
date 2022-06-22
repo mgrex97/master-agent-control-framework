@@ -138,16 +138,17 @@ class JobMasterHandler(BaseApp):
             conn_id = self.conn_map[address]
         except KeyError:
             LOG.info(f'Client {address} not exist.')
-            job.change_state(JOB_CREATE_FAILD)
+            job.change_state(JOB_FAIELD)
             return False
 
-        job_manager: JobManager = self.job_managers[conn_id]
-        msg = job_manager.connection.mcproto_parser.MCPJobCreateRequest(
-            job_manager.connection, timeout=job.timeout, job_info=job.job_info_serialize())
+        if job.remote_mode is True:
+            job_manager: JobManager = self.job_managers[conn_id]
+            msg = job_manager.connection.mcproto_parser.MCPJobCreateRequest(
+                job_manager.connection, timeout=job.timeout, job_info=job.job_info_serialize())
 
-        # msg's xid is None, give new xid to msg.
-        job_manager.connection.set_xid(msg)
-        job_manager.add_request(xid=msg.xid, job_obj=job)
-        job_manager.connection.send_msg(msg)
+            # msg's xid is None, give new xid to msg.
+            job_manager.connection.set_xid(msg)
+            job_manager.add_request(xid=msg.xid, job_obj=job)
+            job_manager.connection.send_msg(msg)
 
-        return msg.xid
+            return msg.xid
