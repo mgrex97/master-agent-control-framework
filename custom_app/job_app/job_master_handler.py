@@ -85,6 +85,12 @@ class JobMasterHandler(BaseApp):
         job.change_state(JOB_RUNING)
         # job.output_handler(ev.msg.job_info)
 
+    @observe_event(mcp_event.EventMCPJobStateChange, MC_STABLE)
+    def job_state_change_hanlder(self, ev):
+        msg: MCPJobStateChange = ev.msg
+        job: Job = self.job_managers[msg.connection.id].get_job(ev.msg.job_id)
+        job.remote_change_state(msg.before, msg.after, msg.info)
+
     def exe_cmd_on_agent(self, address, command):
         assert address in self.job_managers
 
