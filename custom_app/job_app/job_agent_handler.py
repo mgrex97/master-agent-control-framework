@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from custom_app.job_app.job_class import JOB_ASYNC, Job
+from custom_app.job_app.job_util.job_class import Job
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.event import event
 from async_app_fw.event.mcp_event import mcp_event

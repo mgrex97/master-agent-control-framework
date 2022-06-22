@@ -1,7 +1,7 @@
 import logging
 from queue import Empty
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
-from custom_app.job_app.job_class import JOB_ASYNC, JOB_DELETE, Job
+from custom_app.job_app.job_util.job_class import JOB_CREATE, JOB_DELETE, Job
 from async_app_fw.lib import hub
 from async_app_fw.lib.hub import TaskLoop, app_hub
 

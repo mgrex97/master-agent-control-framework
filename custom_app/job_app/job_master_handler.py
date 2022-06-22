@@ -2,7 +2,9 @@ import asyncio
 import logging
 from async_app_fw.lib import hub
 from async_app_fw.lib.hub import app_hub
-from custom_app.job_app.job_class import JOB_ASYNC, JOB_CREATE_FAILD, JOB_DELETE, JOB_RUNING, Job, JobCommand
+from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, Job, JOB_RUNNING
+from custom_app.job_app.job_util.job_subprocess import JobCommand
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.event.mcp_event import mcp_event
 from async_app_fw.controller.handler import observe_event
