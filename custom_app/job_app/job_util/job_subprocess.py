@@ -24,8 +24,9 @@ LOG = logging.getLogger('Job Process Command')
 @collect_handler
 @Job.register_job_type(CMD_JOB)
 class JobCommand(Job):
-    def __init__(self, command, connection=None, timeout=60, state_inform_interval=5):
-        super().__init__(connection, timeout, state_inform_interval)
+    def __init__(self, command, connection=None, timeout=60, state_inform_interval=5, remote_mode=False, remote_role=None):
+        super().__init__(connection, timeout, state_inform_interval,
+                         remote_mode=remote_mode, remote_role=remote_role)
         self.command = command
         self.__process = None
         self.stdin = None
@@ -34,9 +35,9 @@ class JobCommand(Job):
         self.std_task = {}
 
     @classmethod
-    def create_job_by_job_info(cls, job_info, connection):
+    def create_job_by_job_info(cls, job_info, connection, remote_role=None):
         return cls(job_info['cmd_job_info']['command'], connection,
-                   job_info['timeout'], job_info['state_inform_interval'])
+                   job_info['timeout'], job_info['state_inform_interval'], job_info['remote_mode'], remote_role)
 
     def set_output_queue(self, output_queue):
         self.output_queue = output_queue
@@ -91,17 +92,12 @@ class JobCommand(Job):
         async def __read_output_from_std(std: asyncio.StreamReader):
             try:
                 while self.state and self.__process:
-                    # get = await std.readline()
                     get = await std.readline()
                     if len(get) == 0:
                         break
-                    output_info = super(JobCommand, self).job_info_serialize()
-                    output_info['output'] = get.decode(encoding='utf-8')
+                    output = get.decode(encoding='utf-8')
 
-                    self.get_output(get)
-                    # output_msg = self.connection.mcproto_parser.MCPJobOutput(
-                    # self.connection, self.id, json.dumps(output_info))
-                    # self.connection.send_msg(output_msg)
+                    self.get_output(output)
             except asyncio.CancelledError:
                 pass
             except Exception:

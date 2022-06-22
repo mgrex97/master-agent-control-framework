@@ -144,7 +144,7 @@ def observe_output(state):
         def _observe_output(self: Job, *args, **kwargs):
             async def output_handler(*args, **kwargs):
                 if self.remote_mode is True and self.remote_role == REMOTE_AGENT:
-                    self.remote_output(state, *args, **kwargs)
+                    self.remote_output(self.state, *args, **kwargs)
                 else:
                     if inspect.iscoroutinefunction(fun):
                         await fun(*args, **kwargs)
@@ -180,8 +180,6 @@ def handle_state_change(state_change: tuple, end=None):
                     handler(self, *args, **kwargs)
 
                 self.change_state(end)
-                if self.remote_mode is True:
-                    self.send_remote_change_state(after, end)
 
             self.exe_handler(run_handler_change, None, *args, **kwargs)
 
@@ -232,12 +230,11 @@ def action_handler(action, after, cancel_current_task=False):
                 self.LOG.info(f'Remotely Run action <{action}>')
                 # The action is already ensured belong to TAKE_ACTION.
                 # send action to remote
-                self.send_remote_change_state(before, action)
+                self.change_state(action)
             elif self.remote_role == REMOTE_AGENT:
                 async def run_action(*args, **kwargs):
                     self.change_state(action)
                     self.LOG.info(f'Run action <{action}>')
-                    self.send_remote_change_state(before, after)
                     if inspect.iscoroutinefunction(action_method):
                         await action_method(self, *args, **kwargs)
                     else:
@@ -245,7 +242,6 @@ def action_handler(action, after, cancel_current_task=False):
 
                     if self.state == action:
                         self.change_state(after)
-                    self.send_remote_change_state(before, after)
 
                 self.exe_handler(run_action, action, *args, **kwargs)
 
@@ -256,14 +252,13 @@ def action_handler(action, after, cancel_current_task=False):
     return _decorator
 
 
-@collect_handler
 class Job:
     _Job_Types = {}
 
     def __init__(self, connection=None, timeout=60, state_inform_interval=5, remote_mode=False, remote_role=None):
         self.id = 0
-        self.state = JOB_CREATE
         self.connection: MachineConnection = connection
+        self.state = JOB_INIT
         self.remote_mode = remote_mode
         self.handle_task = hub.app_hub.spawn(self._handler_exe_loop)
         self.output_loop = hub.app_hub.spawn(self._output_handler_loop)
@@ -271,18 +266,13 @@ class Job:
         self.state_inform_interval = state_inform_interval
         self._handler_exe_queue = asyncio.Queue()
         self._output_queue = asyncio.Queue()
-        self.LOG = logging.getLogger(f'Job <Creatng>')
-        self.LOG.info("Create Job")
-
-        async def check_queue():
-            while True:
-                await asyncio.sleep(1)
-
-        hub.app_hub.spawn(check_queue)
+        self.LOG = logging.getLogger(f'Job init')
 
         if remote_mode is True:
             assert remote_role in (REMOTE_AGENT, REMOTE_MATER)
             self.remote_role = remote_role
+        else:
+            self.change_state(JOB_CREATED)
 
     async def _output_handler_loop(self):
         try:
@@ -292,7 +282,6 @@ class Job:
                     await observer(state, *args, **kwargs)
                 except Exception:
                     print(traceback.format_exc())
-
         except asyncio.CancelledError:
             pass
 
@@ -329,7 +318,7 @@ class Job:
             (output_handler, self.state, args, kwargs))
 
     @classmethod
-    def create_job_by_job_info(cls, connection, job_info, job_id):
+    def create_job_by_job_info(cls, connection, job_info, job_id, remote_role=None):
         assert job_id > 0
 
         if isinstance(job_info, str):
@@ -337,7 +326,7 @@ class Job:
 
         job_type = job_info['job_type']
         job_obj = cls._Job_Types[job_type].create_job_by_job_info(
-            job_info, connection)
+            job_info, connection, remote_role=remote_role)
         job_obj.set_job_id(job_id)
         return job_obj
 
@@ -355,7 +344,17 @@ class Job:
         self.id = job_id
 
     def change_state(self, state):
-        assert self.state != state
+        if self.state == state:
+            return
+
+        if self.remote_mode is True:
+            if self.connection is not None:
+                self.send_remote_change_state(self.state, state)
+
+            # remote master don't do anything.
+            if self.remote_role == REMOTE_MATER:
+                return
+
         self.LOG.name = f'JOB {STATE_MAPPING[state]}'
         self.LOG.info(
             f'State Change: {STATE_MAPPING[self.state]}  -> {STATE_MAPPING[state]}')
@@ -373,11 +372,16 @@ class Job:
 
         # send state change event to job_handler.
         if self.remote_role == REMOTE_MATER:
-            self.change_state(after)
+            self.LOG.info(
+                f'State Change From Remote: {STATE_MAPPING[self.state]}  -> {STATE_MAPPING[after]}')
+            self.state = after
         elif self.remote_role == REMOTE_AGENT:
             if after in TAKE_ACTION:
                 # exe action
-                self._action_set[after]
+                if after in self._action_set:
+                    self._action_set[after](self)
+                else:
+                    self.change_state(after)
             elif after in ACTION_RESULT:
                 # raise error
                 pass
@@ -411,7 +415,8 @@ class Job:
             'job_id': self.id,
             'job_state': self.state,
             'timeout': self.timeout,
-            'state_inform_interval': self.state_inform_interval
+            'state_inform_interval': self.state_inform_interval,
+            'remote_mode': self.remote_mode,
         }
 
         return output
