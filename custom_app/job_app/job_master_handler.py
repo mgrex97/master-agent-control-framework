@@ -3,7 +3,7 @@ import logging
 from async_app_fw.lib import hub
 from async_app_fw.lib.hub import app_hub
 from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
-from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, Job, JOB_RUNNING
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, REMOTE_MATER, Job
 from custom_app.job_app.job_util.job_subprocess import JobCommand
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.event.mcp_event import mcp_event
@@ -66,10 +66,6 @@ class JobMasterHandler(BaseApp):
 
         msg = conn.mcproto_parser.MCPJobACK(conn, job_id)
         conn.send_msg(msg)
-
-    @observe_event(mcp_event.EventMCPJobStateInform, MC_STABLE)
-    def job_state_inform_handler(self, ev):
-        LOG.info('get inform')
 
     @observe_event(mcp_event.EventMCPJobDeleteReply, MC_STABLE)
     def job_deleted_handler(self, ev):
