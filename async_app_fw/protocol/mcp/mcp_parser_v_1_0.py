@@ -215,7 +215,7 @@ class MCPJobStateChange(MCPMsgBase):
         msg.before = msg.state_change >> 4
         msg.after = msg.state_change & 0x0f
 
-        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_JOB_CREATE_REQUEST_SIZE
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_JOB_STATE_CHANGE_SIZE
 
         # there is no info.
         if msg.info_len == 0:
@@ -252,9 +252,56 @@ class MCPJobStateChange(MCPMsgBase):
 
 
 @_register_parser
-@_set_msg_type(mcproto.MCP_JOB_RUNNING_OUTPUT)
+@_set_msg_type(mcproto.MCP_JOB_OUTPUT)
 class MCPJobOutput(MCPJobIDWithInfo):
-    pass
+    def __init__(self, mcp_connection, job_id=None, state=None, info=None):
+        super().__init__(mcp_connection)
+        self.job_id = job_id
+        self.state = state
+        # maximum size of info: 1024 bytes
+        self.info = info
+        self.info_len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+        msg = super(MCPJobStateChange, cls).parser(
+            mcp_connection, msg_type, msg_len, xid, buf)
+
+        (msg.job_id, msg.state, msg.info_len) = struct.unpack_from(
+            mcproto.MCP_JOB_STATE_CHANGE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.MCP_JOB_OUTPUT_SIZE
+
+        # there is no info.
+        if msg.info_len == 0:
+            msg.info = None
+            msg.info_len = 0
+            return msg
+
+        # retrive job info
+        msg.info_bytes = msg.buf[offset:]
+
+        if msg.info_len < len(msg.info_bytes):
+            msg.info_bytes = msg.info_bytes[:msg.info_len]
+
+        # decode byte and load json.
+        msg.info = json.loads(msg.info_bytes.decode(encoding='utf-8'))
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.job_id is not None
+        assert self.state is not None
+        if self.info is None:
+            self.info = ''
+
+        self.info_bytes = json.dumps(self.info).encode(encoding='utf-8')
+        self.info_len = len(self.info_bytes)
+
+        msg_pack_into(mcproto.MCP_JOB_OUTPUT_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.job_id, self.state, self.info_len)
+
+        self.buf.extend(self.info_bytes)
 
 
 @_register_parser
