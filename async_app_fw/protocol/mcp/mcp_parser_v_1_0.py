@@ -253,7 +253,7 @@ class MCPJobStateChange(MCPMsgBase):
 
 @_register_parser
 @_set_msg_type(mcproto.MCP_JOB_OUTPUT)
-class MCPJobOutput(MCPJobIDWithInfo):
+class MCPJobOutput(MCPMsgBase):
     def __init__(self, mcp_connection, job_id=None, state=None, info=None):
         super().__init__(mcp_connection)
         self.job_id = job_id
@@ -264,7 +264,7 @@ class MCPJobOutput(MCPJobIDWithInfo):
 
     @classmethod
     def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
-        msg = super(MCPJobStateChange, cls).parser(
+        msg = super(MCPJobOutput, cls).parser(
             mcp_connection, msg_type, msg_len, xid, buf)
 
         (msg.job_id, msg.state, msg.info_len) = struct.unpack_from(
