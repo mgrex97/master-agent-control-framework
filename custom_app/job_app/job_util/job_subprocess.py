@@ -116,6 +116,13 @@ class JobCommand(Job):
 
     @action_handler(JOB_STOP, JOB_STOPING)
     def stop(self):
+        for std in (self.stdin, self.stderr, self.stdout):
+            if isinstance(std, asyncio.StreamWriter):
+                std.close()
+                del std
+            elif isinstance(std, asyncio.StreamReader):
+                del std
+
         self.stdin = None
         self.stderr = None
         self.stdout = None
