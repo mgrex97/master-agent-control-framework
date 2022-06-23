@@ -119,7 +119,7 @@ class Hub():
         if os.name == "posix" and isinstance(threading.current_thread(), threading._MainThread):
             asyncio.get_child_watcher().attach_loop(self.loop)
 
-    def spawn(self, func, * args, **kwargs):
+    def spawn(self, func, *args, **kwargs):
         async def _spawn(func, *args, **kwargs):
             name = func.__name__
 
@@ -128,7 +128,8 @@ class Hub():
 
                 if inspect.iscoroutinefunction(func):
                     self.LOG.info(f'Spawn Task {name}')
-                    await func(*args, **kwargs)
+                    res = await func(*args, **kwargs)
+                    return res
                 elif inspect.isfunction(func) or inspect.ismethod(func):
                     self.LOG.info('Spawn callback')
                     self.loop.call_soon(func, *args)
