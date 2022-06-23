@@ -221,7 +221,7 @@ class JobRequest(Job):
         self.request_queue.put_nowait((type, url, data))
 
     @observe_output(JOB_RUNNING)
-    def request_handler(state, result):
+    def request_handler(self, state, result):
         print(result)
 
     @action_handler(JOB_STOP, JOB_STOPING, cancel_current_task=True)

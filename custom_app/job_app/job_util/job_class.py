@@ -155,9 +155,9 @@ def observe_output(state):
                         self.state, fun.__name__, *args, **kwargs)
                 else:
                     if inspect.iscoroutinefunction(fun):
-                        await fun(*args, **kwargs)
+                        await fun(self, *args, **kwargs)
                     else:
-                        fun(*args, **kwargs)
+                        fun(self, *args, **kwargs)
 
             # need to improve
             if self.remote_mode is True and self.remote_role == REMOTE_MATER:

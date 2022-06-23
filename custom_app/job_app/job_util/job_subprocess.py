@@ -50,7 +50,7 @@ class JobCommand(Job):
         return output
 
     @observe_output(JOB_RUNNING)
-    def get_output(state, output):
+    def get_output(self, state, output):
         print(output)
 
     @action_handler(JOB_RUN, JOB_RUNNING)
