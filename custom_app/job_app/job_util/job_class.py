@@ -96,6 +96,7 @@ def collect_handler(cls):
     cls._handler_set = {}
     cls._action_set = {}
     cls._observe_set = {}
+    cls._observe_name_set = {}
 
     def _is_handler_or_action(handler):
         if inspect.isfunction(handler) and \
@@ -122,6 +123,12 @@ def collect_handler(cls):
         elif hasattr(handler, '_action'):
             cls._action_set[handler._action] = handler
         elif hasattr(handler, '_observe'):
+            if handler._observer_name in cls._observe_name_set:
+                raise Exception(
+                    f"There already exist a observer with name '{handler._observer_name}'.")
+
+            cls._observe_name_set[handler._observer_name] = handler
+
             for state in handler._observe:
                 observe_list = cls._observe_set.get(state, None)
 
@@ -144,14 +151,19 @@ def observe_output(state):
         def _observe_output(self: Job, *args, **kwargs):
             async def output_handler(*args, **kwargs):
                 if self.remote_mode is True and self.remote_role == REMOTE_AGENT:
-                    self.remote_output(self.state, *args, **kwargs)
+                    self.remote_output(
+                        self.state, fun.__name__, *args, **kwargs)
                 else:
                     if inspect.iscoroutinefunction(fun):
                         await fun(*args, **kwargs)
                     else:
                         fun(*args, **kwargs)
 
-            self.exe_output(output_handler, *args, **kwargs)
+            # need to improve
+            if self.remote_mode is True and self.remote_role == REMOTE_MATER:
+                self.exe_output(output_handler, *args, **kwargs)
+            else:
+                self.exe_output(output_handler, self.state, *args, **kwargs)
 
         if not hasattr(_observe_output, '_observe'):
             _observe_output._observe = []
@@ -227,14 +239,14 @@ def action_handler(action, after, cancel_current_task=False):
 
             # remote mode is True
             if self.remote_role == REMOTE_MATER:
-                self.LOG.info(f'Remotely Run action <{action}>')
+                self.LOG.info(f'Remotely Run action <{STATE_MAPPING[action]}>')
                 # The action is already ensured belong to TAKE_ACTION.
                 # send action to remote
                 self.change_state(action)
             elif self.remote_role == REMOTE_AGENT:
                 async def run_action(*args, **kwargs):
                     self.change_state(action)
-                    self.LOG.info(f'Run action <{action}>')
+                    self.LOG.info(f'Run action <{STATE_MAPPING[action]}>')
                     if inspect.iscoroutinefunction(action_method):
                         await action_method(self, *args, **kwargs)
                     else:
@@ -313,9 +325,9 @@ class Job:
         self._handler_exe_queue.put_nowait(
             (handler, state_change_when_hanlder_start, args, kwargs))
 
-    def exe_output(self, output_handler, *args, **kwargs):
+    def exe_output(self, output_handler, state, *args, **kwargs):
         self._output_queue.put_nowait(
-            (output_handler, self.state, args, kwargs))
+            (output_handler, state, args, kwargs))
 
     @classmethod
     def create_job_by_job_info(cls, connection, job_info, job_id, remote_role=None):
@@ -386,7 +398,8 @@ class Job:
                 # raise error
                 pass
 
-    def remote_output(self, state, *args, **kwargs):
+    def remote_output(self, state, observer_name, *args, **kwargs):
+        kwargs['observer_name'] = observer_name
         output = {'args': args, 'kwargs': kwargs}
         msg = MCPJobOutput(self.connection, self.id, state, output)
 
@@ -395,7 +408,8 @@ class Job:
     def get_remote_output(self, state, info=None):
         args = info['args']
         kwargs = info['kwargs']
-        self.exe_output(state, *args, **kwargs)
+        output_handler = self._observe_name_set[kwargs.pop('observer_name')]
+        output_handler(self, *args, **kwargs)
 
     def run(self):
         pass

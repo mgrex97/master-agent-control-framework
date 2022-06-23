@@ -52,6 +52,20 @@ class JobMasterHandler(BaseApp):
 
         self.conn_map = {conn.address[0]: conn.id}
 
+        async def test_job():
+            job = JobCommand('ping -c 3 8.8.8.8',
+                             remote_mode=True, remote_role=REMOTE_MATER)
+            self.install_job(job, '127.0.0.1')
+            # self.install_job(JobCommand(
+            # 'ping 168.95.1.1'), '127.0.0.1')
+            # self.install_job(JobCommand(
+            # 'ping 192.168.100.1'), '127.0.0.1')
+            await asyncio.sleep(3)
+            job.run()
+            # self.clear_job('127.0.0.1')
+
+        app_hub.spawn(test_job)
+
     def agent_machine_leave(self, ev):
         del self.job_managers[ev.connection.id]
 
@@ -78,8 +92,7 @@ class JobMasterHandler(BaseApp):
         conn_id = ev.msg.connection.id
         job_id = ev.msg.job_id
         job: Job = self.job_managers[conn_id].get_job(job_id)
-        job.change_state(JOB_RUNING)
-        # job.output_handler(ev.msg.job_info)
+        job.get_remote_output(ev.msg.state, ev.msg.info)
 
     @observe_event(mcp_event.EventMCPJobStateChange, MC_STABLE)
     def job_state_change_hanlder(self, ev):

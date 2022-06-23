@@ -58,8 +58,6 @@ class JobManager:
         assert job is not None
         assert job.id != 0
 
-        job.run_job()
-
     def get_new_job_id(self):
         job_id = self.__job_serial_id
         self.__job_serial_id = self.__job_serial_id + 1
