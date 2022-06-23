@@ -2,7 +2,9 @@ import asyncio
 import logging
 from async_app_fw.lib import hub
 from async_app_fw.lib.hub import app_hub
-from custom_app.job_app.job_class import JOB_ASYNC, JOB_CREATE_FAILD, JOB_DELETE, JOB_RUNING, Job, JobCommand
+from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, REMOTE_MATER, Job
+from custom_app.job_app.job_util.job_subprocess import JobCommand
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.event.mcp_event import mcp_event
 from async_app_fw.controller.handler import observe_event
@@ -65,10 +67,6 @@ class JobMasterHandler(BaseApp):
         msg = conn.mcproto_parser.MCPJobACK(conn, job_id)
         conn.send_msg(msg)
 
-    @observe_event(mcp_event.EventMCPJobStateInform, MC_STABLE)
-    def job_state_inform_handler(self, ev):
-        LOG.info('get inform')
-
     @observe_event(mcp_event.EventMCPJobDeleteReply, MC_STABLE)
     def job_deleted_handler(self, ev):
         conn = ev.msg.connection
@@ -80,8 +78,13 @@ class JobMasterHandler(BaseApp):
         conn_id = ev.msg.connection.id
         job_id = ev.msg.job_id
         job: Job = self.job_managers[conn_id].get_job(job_id)
-        job.change_state(JOB_RUNING)
-        # job.output_handler(ev.msg.job_info)
+        job.get_remote_output(ev.msg.state, ev.msg.info)
+
+    @observe_event(mcp_event.EventMCPJobStateChange, MC_STABLE)
+    def job_state_change_hanlder(self, ev):
+        msg: MCPJobStateChange = ev.msg
+        job: Job = self.job_managers[msg.connection.id].get_job(ev.msg.job_id)
+        job.remote_change_state(msg.before, msg.after, msg.info)
 
     def exe_cmd_on_agent(self, address, command):
         assert address in self.job_managers
@@ -136,16 +139,17 @@ class JobMasterHandler(BaseApp):
             conn_id = self.conn_map[address]
         except KeyError:
             LOG.info(f'Client {address} not exist.')
-            job.change_state(JOB_CREATE_FAILD)
+            job.change_state(JOB_FAIELD)
             return False
 
-        job_manager: JobManager = self.job_managers[conn_id]
-        msg = job_manager.connection.mcproto_parser.MCPJobCreateRequest(
-            job_manager.connection, timeout=job.timeout, job_info=job.job_info_serialize())
+        if job.remote_mode is True:
+            job_manager: JobManager = self.job_managers[conn_id]
+            msg = job_manager.connection.mcproto_parser.MCPJobCreateRequest(
+                job_manager.connection, timeout=job.timeout, job_info=job.job_info_serialize())
 
-        # msg's xid is None, give new xid to msg.
-        job_manager.connection.set_xid(msg)
-        job_manager.add_request(xid=msg.xid, job_obj=job)
-        job_manager.connection.send_msg(msg)
+            # msg's xid is None, give new xid to msg.
+            job_manager.connection.set_xid(msg)
+            job_manager.add_request(xid=msg.xid, job_obj=job)
+            job_manager.connection.send_msg(msg)
 
-        return msg.xid
+            return msg.xid

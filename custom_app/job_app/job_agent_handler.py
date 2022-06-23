@@ -1,16 +1,18 @@
 import asyncio
 import logging
-from custom_app.job_app.job_class import JOB_ASYNC, Job
+from custom_app.job_app.job_util.job_class import REMOTE_AGENT, Job
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.event import event
 from async_app_fw.event.mcp_event import mcp_event
 from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
+from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
 from custom_app.job_app.job_manager import JobManager
-from async_app_fw.lib.hub import TaskLoop, app_hub
 
 _REQUIRED_APP = [
     'async_app_fw.controller.mcp_controller.agent_handler']
+
+APP_NAME_JobAgentHandler = 'job_agent_handler'
 
 
 class JobAgentHandler(BaseApp):
@@ -18,7 +20,7 @@ class JobAgentHandler(BaseApp):
 
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
-        self.name = 'job_agent_handler'
+        self.name = APP_NAME_JobAgentHandler
         self.job_manager: JobManager = JobManager()
         self.connection = None
         self.job_clear_task_loop = None
@@ -42,7 +44,7 @@ class JobAgentHandler(BaseApp):
 
         new_job_id = self.job_manager.get_new_job_id()
         job_obj = Job.create_job_by_job_info(
-            self.connection, ev.msg.job_info, new_job_id)
+            self.connection, ev.msg.job_info, new_job_id, REMOTE_AGENT)
 
         self.job_manager.add_job(job_obj)
 
@@ -54,20 +56,16 @@ class JobAgentHandler(BaseApp):
         msg.xid = xid
         conn.send_msg(msg)
 
-    @observe_event(mcp_event.EventMCPJobACK, MC_STABLE)
-    def job_ack_hanlder(self, ev):
+    @observe_event(mcp_event.EventMCPJobStateChange, MC_STABLE)
+    def job_state_change_hanlder(self, ev):
+        msg: MCPJobStateChange = ev.msg
         job: Job = self.job_manager.get_job(ev.msg.job_id)
-        job.change_state(JOB_ASYNC)
-        job.run_job()
+        job.remote_change_state(msg.before, msg.after, msg.info)
 
     @observe_event(mcp_event.EventMCPJobDeleteRequest, MC_STABLE)
     def job_delete_request_hanlder(self, ev):
         self.LOG.info(f"Delete Job request, Job ID <{ev.msg.job_id}>")
         self.job_manager.del_job(ev.msg.job_id)
-        # conn = ev.connection
-        # reply delete result
-        # reply_msg = ev.msg.cls_msg_type(ev.connection, ev.msg.job_id)
-        # conn.set_xid(reply_msg)
 
     @observe_event(mcp_event.EventMCPJobDeleteAll, MC_STABLE)
     def job_delete_all_handler(self, ev):

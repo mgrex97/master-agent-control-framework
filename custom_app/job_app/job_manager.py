@@ -1,59 +1,12 @@
 import logging
 from queue import Empty
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
-from custom_app.job_app.job_class import JOB_ASYNC, JOB_DELETE, Job
+from custom_app.job_app.job_util.job_class import JOB_CREATE, JOB_DELETE, Job
 from async_app_fw.lib import hub
 from async_app_fw.lib.hub import TaskLoop, app_hub
 
 
 LOG = logging.getLogger('custom_app.job_app.job_manager')
-
-
-"""
-class ThreadCommunicateQueue:
-    def __init__(self):
-        self.q_send = hub.Queue(maxsize=1)
-        self.q_back = hub.Queue(maxsize=1)
-
-    def send(self, item, block=False):
-        self.q_send.put(item, block=block)
-
-    def send_back(self, item, block=False):
-        self.q_back.put(item, block=block)
-
-    def wait_send(self):
-        while True:
-            try:
-                item = self.q_send.get(block=False)
-                LOG.info(f'Get item from Queue. Item {item}')
-                return item
-            except Empty:
-                hub.sleep(0.1)
-
-    def wait_back(self):
-        while True:
-            try:
-                item = self.q_back.get(block=False)
-                LOG.info(f'Get item from Queue. Item {item}')
-                return item
-            except Empty:
-                hub.sleep(0.1)
-
-
-class JobCreateComm(ThreadCommunicateQueue):
-    def __init__(self):
-        self.q_send = hub.Queue(maxsize=1)
-        self.q_back = hub.Queue(maxsize=1)
-        self.check = False
-
-    def set_xid(self, xid):
-        self.xid = xid
-        self.check = False
-
-    def send_back(self, item, block=False):
-        self.check = True
-        return super().send_back(item, block)
-"""
 
 
 class JobManager:
@@ -81,8 +34,10 @@ class JobManager:
         assert job_id not in self.jobs
         job: Job = self.job_request.get(xid, None)
         assert job is not None
+        # update job id
+        job.id = job_id
         self.jobs[job_id] = job
-        job.change_state(JOB_ASYNC)
+        job.change_state(JOB_CREATE)
 
     def del_job(self, job_id):
         self.jobs[job_id].change_state(JOB_DELETE)
@@ -102,8 +57,6 @@ class JobManager:
         job: Job = self.jobs.get(job_id, None)
         assert job is not None
         assert job.id != 0
-
-        job.run_job()
 
     def get_new_job_id(self):
         job_id = self.__job_serial_id
