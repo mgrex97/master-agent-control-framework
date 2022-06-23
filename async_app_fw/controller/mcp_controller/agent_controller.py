@@ -37,7 +37,7 @@ from async_app_fw.lib import hub
 
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(
-    'eventlent_framework.controller.tshark.tshark_controller')
+    'Machine Agent Controller')
 
 
 class MachineControlAgentController(object):
