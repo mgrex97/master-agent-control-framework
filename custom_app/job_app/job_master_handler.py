@@ -52,20 +52,6 @@ class JobMasterHandler(BaseApp):
 
         self.conn_map = {conn.address[0]: conn.id}
 
-        async def test_job():
-            job = JobCommand('ping -c 3 8.8.8.8',
-                             remote_mode=True, remote_role=REMOTE_MATER)
-            self.install_job(job, '127.0.0.1')
-            # self.install_job(JobCommand(
-            # 'ping 168.95.1.1'), '127.0.0.1')
-            # self.install_job(JobCommand(
-            # 'ping 192.168.100.1'), '127.0.0.1')
-            await asyncio.sleep(3)
-            job.run()
-            # self.clear_job('127.0.0.1')
-
-        app_hub.spawn(test_job)
-
     def agent_machine_leave(self, ev):
         del self.job_managers[ev.connection.id]
 
