@@ -1,14 +1,14 @@
 import asyncio
 import logging
+from async_app_fw.event.event import EventBase
 from async_app_fw.lib import hub
-from async_app_fw.lib.hub import app_hub
 from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
-from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, REMOTE_MATER, Job
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, Job
 from custom_app.job_app.job_util.job_subprocess import JobCommand
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.event.mcp_event import mcp_event
 from async_app_fw.controller.handler import observe_event
-from async_app_fw.controller.mcp_controller.mcp_state import MC_STABLE
+from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
 from custom_app.job_app.job_manager import JobManager
 
 _REQUIRED_APP = [
@@ -17,7 +17,22 @@ _REQUIRED_APP = [
 LOG = logging.getLogger('custom_app.job_app.jog_master_handler')
 
 
+class EventJobManagerReady(EventBase):
+    def __init__(self, job_app, address):
+        super(EventJobManagerReady, self).__init__()
+        self.address = address
+        self.job_app = job_app
+
+
+class EventJobManagerDelete(EventBase):
+    def __init__(self, address):
+        super(EventJobManagerDelete, self).__init__()
+        self.address = address
+
+
 class JobMasterHandler(BaseApp):
+    _EVENTS = [EventJobManagerDelete, EventJobManagerReady]
+
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
         self.name = 'job_master_handler'
@@ -47,10 +62,26 @@ class JobMasterHandler(BaseApp):
     @observe_event(mcp_event.EventMCPStateChange, MC_STABLE)
     def agent_join(self, ev):
         conn = ev.connection
+        LOG.info(f'Create Job Manager {conn.address[0]}')
+
+        if conn.id in self.job_managers and isinstance(self.job_managers[conn.id], JobManager):
+            del self.job_managers[conn.id]
+
         self.job_managers[conn.id] = JobManager(
             ev.connection)
 
         self.conn_map = {conn.address[0]: conn.id}
+
+        self.send_event_to_observers(
+            EventJobManagerReady(self, conn.address[0]), MC_STABLE)
+
+    @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
+    def agent_leave(self, ev):
+        conn = ev.connection
+        LOG.info(f'Delete Job Manager {conn.address[0]}.')
+
+        self.send_event_to_observers(
+            EventJobManagerDelete(conn.address[0]), MC_STABLE)
 
     def agent_machine_leave(self, ev):
         del self.job_managers[ev.connection.id]
