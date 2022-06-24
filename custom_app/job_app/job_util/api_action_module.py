@@ -67,6 +67,7 @@ class SwitchAPIAction:
             'method': 'post',
             'path': self.get_api_url_with_path(self.login_path),
             'data': data,
+            'host_name': self.hostname
         }
         login_info['auth_path'] = "result.AccessToken" if self.api_version == 'v3' else 'result'
 
