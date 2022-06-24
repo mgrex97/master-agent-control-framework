@@ -78,12 +78,18 @@ class JobMasterHandler(BaseApp):
         conn_id = ev.msg.connection.id
         job_id = ev.msg.job_id
         job: Job = self.job_managers[conn_id].get_job(job_id)
+        if job is None:
+            LOG.warning(f'Job Output Error: {ev.msg.job_id} not exist.')
+            return
         job.get_remote_output(ev.msg.state, ev.msg.info)
 
     @observe_event(mcp_event.EventMCPJobStateChange, MC_STABLE)
     def job_state_change_hanlder(self, ev):
         msg: MCPJobStateChange = ev.msg
         job: Job = self.job_managers[msg.connection.id].get_job(ev.msg.job_id)
+        if job is None:
+            LOG.warning(f'Job State Change Error: {ev.msg.job_id} not exist.')
+            return
         job.remote_change_state(msg.before, msg.after, msg.info)
 
     def exe_cmd_on_agent(self, address, command):
