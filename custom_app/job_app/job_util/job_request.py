@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import json
 import logging
 import re
 from time import time
@@ -161,6 +162,7 @@ class JobRequest(Job):
         self.request_info = request_info
         self.times = request_info.get('running_times', 5)
         self.retry_mode = request_info.get('retry_mode', False)
+        self.output_method = None
 
         if self.retry_mode is True:
             self.retry_data = request_info['retry_data']
@@ -178,6 +180,9 @@ class JobRequest(Job):
     def create_job_by_job_info(cls, job_info, connection, remote_role=None):
         return cls(job_info['request_info'], connection,
                    job_info['timeout'], job_info['state_inform_interval'], job_info['remote_mode'], remote_role)
+
+    def set_output_method(self, method):
+        self.output_method = method
 
     def job_info_serialize(self):
         output = super().job_info_serialize()
@@ -225,7 +230,11 @@ class JobRequest(Job):
 
     @observe_output(JOB_RUNNING)
     def request_handler(self, state, result):
-        print(result)
+        if self.output_method is not None:
+            method = self.output_method
+            method(self.request_info, result)
+        else:
+            print(result)
 
     @action_handler(JOB_STOP, JOB_STOPING, cancel_current_task=True)
     async def stop(self):
