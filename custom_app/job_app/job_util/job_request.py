@@ -188,9 +188,12 @@ class JobRequest(Job):
     def run(self):
         pass
 
-    async def spawn_request_with_call_back(self, type, url, data):
-        res = await self.api_action.method_set[type](url, data)
-        self.request_handler(res.json())
+    async def spawn_request_with_callback(self, type, url, data):
+        res: requests.Response = await self.api_action.method_set[type](url, data)
+        try:
+            self.request_handler(res.json())
+        except json.decoder.JSONDecodeError:
+            self.LOG.warning("Can't decode response.")
 
     @handle_state_change((JOB_RUN, JOB_RUNNING), JOB_STOP)
     async def request_consumer(self):
@@ -204,10 +207,10 @@ class JobRequest(Job):
                 if self.retry_mode is False:
                     (type, url, data) = await self.request_queue.get()
                     app_hub.spawn(
-                        self.spawn_request_with_call_back, type, url, data)
+                        self.spawn_request_with_callback, type, url, data)
                 else:
                     app_hub.spawn(
-                        self.spawn_request_with_call_back, type, url, data)
+                        self.spawn_request_with_callback, type, url, data)
                     await asyncio.sleep(self.retry_interval)
 
         except asyncio.CancelledError:
