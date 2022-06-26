@@ -159,7 +159,10 @@ class JobRequest(Job):
     def __init__(self, request_info: dict, connection=None, timeout=60, state_inform_interval=5, remote_mode=False, remote_role=None):
         super().__init__(connection, timeout, state_inform_interval,
                          remote_mode=remote_mode, remote_role=remote_role)
-        self.request_info = request_info
+        self.request_info = request_info.copy()
+        self.host_ip = request_info['host_ip']
+        self.host_name = request_info['login_info']['host_name']
+        self.task_dict = None
         self.times = request_info.get('running_times', 5)
         self.retry_mode = request_info.get('retry_mode', False)
         self.output_method = None
@@ -193,15 +196,24 @@ class JobRequest(Job):
     def run(self):
         pass
 
-    async def spawn_request_with_callback(self, type, url, data):
+    async def spawn_request_with_callback(self, request_id, type, url, data):
+        request_info = {
+            'type': type, 'url': url, 'data': data,
+            'host_ip': self.host_ip, 'host_name': self.host_name
+        }
         res: requests.Response = await self.api_action.method_set[type](url, data)
+
+        # pop out request task from task_dict
+        self.task_dict.pop(request_id)
         try:
-            self.request_handler(res.json())
+            self.request_handler(request_info, res.json())
         except json.decoder.JSONDecodeError:
             self.LOG.warning("Can't decode response.")
 
     @handle_state_change((JOB_RUN, JOB_RUNNING), JOB_STOP)
     async def request_consumer(self):
+        request_id = 0
+        self.task_dict = {}
         time_tmp = time() + self.times
         try:
             if self.retry_mode is True:
@@ -211,34 +223,45 @@ class JobRequest(Job):
             while time() < time_tmp:
                 if self.retry_mode is False:
                     (type, url, data) = await self.request_queue.get()
-                    app_hub.spawn(
-                        self.spawn_request_with_callback, type, url, data)
-                else:
-                    app_hub.spawn(
-                        self.spawn_request_with_callback, type, url, data)
+
+                self.task_dict[request_id] = app_hub.spawn(
+                    self.spawn_request_with_callback, request_id, type, url, data)
+
+                request_id = request_id + 1
+                if self.remote_mode is True:
                     await asyncio.sleep(self.retry_interval)
 
         except asyncio.CancelledError:
             pass
         except Exception as e:
             exception_info = traceback.format_exc(e)
-        # cancel all task
+        finally:
+            pass
 
     def push_request_data_to_queue(self, type, url, data):
         assert self.retry_mode is False
         self.request_queue.put_nowait((type, url, data))
 
     @observe_output(JOB_RUNNING)
-    def request_handler(self, state, result):
+    def request_handler(self, state, request_info, result):
         if self.output_method is not None:
             method = self.output_method
-            method(self.request_info, result)
+            # send request_info and result to output_method
+            method(request_info, result)
         else:
             print(result)
 
     @action_handler(JOB_STOP, JOB_STOPING, cancel_current_task=True)
     async def stop(self):
-        pass
+        if self.task_dict is not None:
+            # cancel, delete request task.
+            for task in self.task_dict:
+                task.cancel()
+                del task
+
+            # reset task_dict
+            del self.task_dict
+            self.task_dict = None
 
     def __del__(self):
         pass
