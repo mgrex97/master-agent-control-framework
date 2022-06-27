@@ -5,7 +5,7 @@ import traceback
 
 from async_app_fw.lib import hub
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
-from custom_app.job_app.job_util.job_class import Job, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, action_handler, collect_handler, handle_state_change, observe_output
+from custom_app.job_app.job_util.job_class import Job, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, action_handler, collect_handler, handle_state_change, ObserveOutput
 
 CMD_JOB = 1
 
@@ -49,7 +49,7 @@ class JobCommand(Job):
         }
         return output
 
-    @observe_output(JOB_RUNNING)
+    @ObserveOutput(JOB_RUNNING)
     def get_output(self, state, output):
         print(output)
 

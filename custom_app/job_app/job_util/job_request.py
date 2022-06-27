@@ -8,7 +8,7 @@ import traceback
 from typing import Awaitable
 import requests
 from async_app_fw.lib.hub import app_hub
-from custom_app.job_app.job_util.job_class import JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPING, REMOTE_MATER, Job, action_handler, handle_state_change, observe_output, collect_handler
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPING, REMOTE_MATER, Job, action_handler, handle_state_change, collect_handler, ObserveOutput
 
 REQUEST_JOB = 2
 
@@ -242,7 +242,7 @@ class JobRequest(Job):
         assert self.retry_mode is False
         self.request_queue.put_nowait((type, url, data))
 
-    @observe_output(JOB_RUNNING)
+    @ObserveOutput(JOB_RUNNING)
     def request_handler(self, state, request_info, result):
         if self.output_method is not None:
             method = self.output_method

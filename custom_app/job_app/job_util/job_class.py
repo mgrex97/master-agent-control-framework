@@ -144,35 +144,86 @@ def collect_handler(cls):
     return cls
 
 
-def observe_output(state):
-    state = _listify(state)
+class ObserveOutput(object):
+    def __init__(self, state, agent_handle=False, remote_output=True) -> None:
+        self.state = _listify(state)
+        self.agent_handler = agent_handle
+        self.remote_output = remote_output
 
-    def _decorator(fun):
-        def _observe_output(self: Job, *args, **kwargs):
-            async def output_handler(*args, **kwargs):
-                if self.remote_mode is True and self.remote_role == REMOTE_AGENT:
-                    self.remote_output(
-                        self.state, fun.__name__, *args, **kwargs)
+    # deorate observer
+    def __call__(_self, fun):
+        _self.fun = fun
+
+        # if function had already decorated.
+        if hasattr(fun, '_observe'):
+            # add state to _observe
+            fun._observe.extend(_listify(_self.state))
+            return fun
+
+        # init observe_action
+        observe_action = []
+        observe_action.extend(_self.state)
+
+        def _output_handler(self: Job, *args, **kwargs):
+            current_state = self.state
+
+            async def output(*args, **kwargs):
+                if inspect.iscoroutinefunction(fun):
+                    await fun(self, current_state, *args, **kwargs)
                 else:
-                    if inspect.iscoroutinefunction(fun):
-                        await fun(self, *args, **kwargs)
-                    else:
-                        fun(self, *args, **kwargs)
+                    fun(self, current_state, *args, **kwargs)
 
-            # need to improve
-            if self.remote_mode is True and self.remote_role == REMOTE_MATER:
-                self.exe_output(output_handler, *args, **kwargs)
-            else:
-                self.exe_output(output_handler, self.state, *args, **kwargs)
+            if self.state not in observe_action:
+                self.LOG.warning(
+                    f"The current job state {STATE_MAPPING[self.state]} is not handler {fun.__name__} want.")
+                return
 
-        if not hasattr(_observe_output, '_observe'):
-            _observe_output._observe = []
+            # Assume at remote mode, job always running on agent,
+            # then job need to output job to remote master.
+            while True:
+                if self.remote_mode is False:
+                    break
 
-        _observe_output._observe.extend(state)
-        _observe_output._observer_name = fun.__name__
+                if self.remote_role is REMOTE_MATER:
+                    break
 
-        return _observe_output
-    return _decorator
+                # remote agent need to return output to master if remote_output is True.
+                if _self.remote_output is True:
+                    ObserveOutput._remote_output(
+                        self, fun, *args, **kwargs)
+
+                # If agent_handle is False there is no need to deal with output.
+                if _self.agent_handler is True:
+                    break
+
+                return
+
+            # Put variable and output_observer (method) into output queue.
+            ObserveOutput._put_output_handler(
+                self, output, *args, **kwargs)
+
+        # basic setting
+        _output_handler._observe = observe_action
+        _output_handler._observe.extend(_self.state)
+        _output_handler._observer_name = fun.__name__
+
+        return _output_handler
+
+    # send output to remote master.
+    @staticmethod
+    def _remote_output(job_obj, fun, *args, **kwargs):
+        job_obj.remote_output(
+            job_obj.state, fun.__name__, *args, **kwargs)
+
+    # put output handler and variable to exe_output_queue
+    @staticmethod
+    def _put_output_handler(job_obj, output_observer, *args, **kwargs):
+        # need to improve
+        if job_obj.remote_mode is True and job_obj.remote_role == REMOTE_MATER:
+            job_obj.exe_output(output_observer, *args, **kwargs)
+        else:
+            job_obj.exe_output(output_observer, job_obj.state, *args, **kwargs)
+
 
 
 def handle_state_change(state_change: tuple, end=None):
