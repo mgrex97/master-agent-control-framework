@@ -134,7 +134,7 @@ def collect_handler(cls):
 
                 if observe_list is not None:
                     log_collect_handler.warning(
-                        f'There has duplicated hanlders handle same state change. {state_change}')
+                        f'There has duplicated hanlders handle same state change. {state}')
                 else:
                     observe_list = []
                     cls._observe_set.setdefault(state, observe_list)
@@ -204,7 +204,6 @@ class ObserveOutput(object):
 
         # basic setting
         _output_handler._observe = observe_action
-        _output_handler._observe.extend(_self.state)
         _output_handler._observer_name = fun.__name__
 
         return _output_handler
