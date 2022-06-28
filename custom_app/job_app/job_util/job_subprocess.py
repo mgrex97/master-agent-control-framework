@@ -5,7 +5,8 @@ import traceback
 
 from async_app_fw.lib import hub
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
-from custom_app.job_app.job_util.job_class import Job, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, action_handler, collect_handler, handle_state_change, ObserveOutput
+from custom_app.job_app.job_util.job_class import Job, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, action_handler, collect_handler
+from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange
 
 CMD_JOB = 1
 
@@ -57,7 +58,7 @@ class JobCommand(Job):
     def run(self):
         pass
 
-    @handle_state_change((JOB_RUN, JOB_RUNNING), JOB_STOP)
+    @HandleStateChange((JOB_RUN, JOB_RUNNING), JOB_STOP)
     async def _run_command(self):
         try:
             self.__process = await asyncio.create_subprocess_shell(
@@ -127,7 +128,7 @@ class JobCommand(Job):
         self.stderr = None
         self.stdout = None
 
-    @handle_state_change((JOB_STOP, JOB_STOPING), JOB_STOPED)
+    @HandleStateChange((JOB_STOP, JOB_STOPING), JOB_STOPED)
     async def _subprocess_stop(self):
         process = self.__process
         self.__process = None

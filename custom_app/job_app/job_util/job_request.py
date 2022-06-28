@@ -8,7 +8,8 @@ import traceback
 from typing import Awaitable
 import requests
 from async_app_fw.lib.hub import app_hub
-from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPING, REMOTE_MATER, Job, action_handler, handle_state_change, collect_handler, ObserveOutput
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPING, REMOTE_MATER, Job, action_handler, collect_handler
+from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange
 
 REQUEST_JOB = 2
 
@@ -210,7 +211,7 @@ class JobRequest(Job):
         except json.decoder.JSONDecodeError:
             self.LOG.warning("Can't decode response.")
 
-    @handle_state_change((JOB_RUN, JOB_RUNNING), JOB_STOP)
+    @HandleStateChange((JOB_RUN, JOB_RUNNING), JOB_STOP)
     async def request_consumer(self):
         request_id = 0
         self.task_dict = {}
