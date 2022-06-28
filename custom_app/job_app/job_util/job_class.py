@@ -304,25 +304,50 @@ class HandleStateChange(object):
         return _handle_state_change
 
 
-def action_handler(action, after, cancel_current_task=False):
-    assert action in TAKE_ACTION
+class ActionHandler(object):
+    def __init__(self, action, after, require_before=False, cancel_current_task=False):
+        assert action in TAKE_ACTION
+        self.action = action
+        self.after = after
+        self.cancel_current_task = cancel_current_task
+        self.require_before = require_before
 
-    def _decorator(action_method):
-        def __action_handler(self: Job, *args, **kwargs):
+    def __call__(_self, handler):
+        _self.handler = handler
+
+        if hasattr(handler, '_action'):
+            raise Exception(
+                f'{handler.__name__} had already bind with an action.')
+
+        def _action_handler(self: Job, *args, **kwargs):
             before = self.state
+            cancel_task = kwargs.pop(
+                'cancel_current_task', _self.cancel_current_task)
+
+            # clear exe queue
+            if cancel_task is True:
+                self.reset_exe_loop()
+
+            action = _self.action
             if self.remote_mode is False:
                 async def run_action(*args, **kwargs):
+
+                    if _self.require_before is True:
+                        kwargs['before'] = before
+
                     self.LOG.info(
-                        f'Run action <{STATE_MAPPING[action]}>, method: <{action_method.__name__}>')
-                    if inspect.iscoroutinefunction(action_method):
-                        await action_method(self, *args, **kwargs)
+                        f'Run action <{STATE_MAPPING[action]}>, method: <{handler.__name__}>')
+                    if inspect.iscoroutinefunction(handler):
+                        await handler(self, *args, **kwargs)
                     else:
-                        action_method(self, *args, **kwargs)
+                        handler(self, *args, **kwargs)
+
+                    # if sate not change yet after action handler finished.
                     if self.state == action:
-                        self.change_state(after)
+                        self.change_state(_self.after)
 
                 self.exe_handler(
-                    run_action, action, *args, **kwargs)
+                    run_action, handler, *args, **kwargs)
                 return
 
             # remote mode is True
@@ -335,21 +360,27 @@ def action_handler(action, after, cancel_current_task=False):
                 async def run_action(*args, **kwargs):
                     self.change_state(action)
                     self.LOG.info(f'Run action <{STATE_MAPPING[action]}>')
-                    if inspect.iscoroutinefunction(action_method):
-                        await action_method(self, *args, **kwargs)
+                    if inspect.iscoroutinefunction(handler):
+                        await handler(self, *args, **kwargs)
                     else:
-                        action_method(self, *args, **kwargs)
+                        handler(self, *args, **kwargs)
 
                     if self.state == action:
-                        self.change_state(after)
+                        self.change_state(_self.after)
 
                 self.exe_handler(run_action, action, *args, **kwargs)
 
-        __action_handler._action = action
-        __action_handler._handler_name = action_method.__name__
+        _action_handler._action = _self.action
+        _action_handler._handler_name = handler.__name__
 
-        return __action_handler
-    return _decorator
+        return _action_handler
+
+
+class TaskQueueStopRunning:
+    pass
+
+
+task_stop_obj = TaskQueueStopRunning()
 
 
 class Job:
@@ -378,6 +409,10 @@ class Job:
         try:
             while True:
                 (observer, state, args, kwargs) = await self._output_queue.get()
+
+                if isinstance(observer, TaskQueueStopRunning):
+                    break
+
                 try:
                     await observer(state, *args, **kwargs)
                 except Exception:
@@ -386,28 +421,45 @@ class Job:
             pass
 
     async def _handler_exe_loop(self):
-        try:
-            while True:
+        while True:
+            try:
                 (handler, state_change_when_running, args, kwargs) = await self._handler_exe_queue.get()
+
+                if isinstance(handler, TaskQueueStopRunning):
+                    break
+
                 if state_change_when_running is not None and \
                         state_change_when_running != self.state:
                     self.change_state(state_change_when_running)
 
                 before = self.state
+
                 await handler(*args, **kwargs)
+
                 after = self.state
 
-                if after in TAKE_ACTION:
-                    handler = self._action_set[after]
-                    handler(self)
-                elif after in ACTION_RESULT:
-                    key = _state_change_to_key(before, after)
-                    if key in self._handler_set:
-                        for handler in self._handler_set[key]:
-                            handler(self, key, before, after)
+                # if exe_queue is empty, automatically find next step.
+                if self._handler_exe_queue.empty():
+                    if after in TAKE_ACTION:
+                        handler = self._action_set[after]
+                        handler(self)
+                    elif after in ACTION_RESULT:
+                        key = _state_change_to_key(before, after)
+                        if key in self._handler_set:
+                            for handler in self._handler_set[key]:
+                                handler(self, key, before, after)
+            except asyncio.CancelledError:
+                self.LOG.warning('handler execute loop stop.')
 
-        except asyncio.CancelledError:
-            self.LOG.warning('handler execute loop stop.')
+    def reset_exe_loop(self):
+        try:
+            while self._handler_exe_queue.get_nowait():
+                pass
+        except asyncio.QueueEmpty:
+            pass
+        finally:
+            if self.handle_task.done() is False:
+                self.handle_task.cancel()
 
     def exe_handler(self, handler, state_change_when_hanlder_start=None, *args, **kwargs):
         self._handler_exe_queue.put_nowait(
@@ -505,8 +557,14 @@ class Job:
     def stop(self):
         pass
 
-    def delete(self):
-        pass
+    async def delete(self):
+        self.reset_exe_loop()
+        # send stop obj to both queue.
+        self.exe_handler(task_stop_obj)
+        self.exe_output(task_stop_obj, 'Delete Task loop.')
+
+        await self._handler_exe_loop
+        await self._output_handler_loop
 
     def job_info_serialize(self, output=None):
         if output is None:
