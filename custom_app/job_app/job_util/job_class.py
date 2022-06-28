@@ -157,17 +157,19 @@ class ObserveOutput(object):
         # if function had already decorated.
         if hasattr(fun, '_observe'):
             # add state to _observe
-            fun._observe.extend(_listify(_self.state))
-            return fun
+            _self.set_action_dict(_self.state, fun._observe)
+            # No need to create function _output_handler again.
+            return
 
-        # init observe_action
-        observe_action = []
-        observe_action.extend(_self.state)
+        # init observe_action, create _output_handler
+        observe_action = {}
+        _self.set_action_dict(_self.state, observe_action)
 
-        def _output_handler(self: Job, *args, **kwargs):
-            current_state = self.state
+        # Detect remote_mode, send output to remote master or push to jobs's _output_queue.
+        def _output_handler(self: Job, *args, state=None, **kwargs):
+            current_state = state if state is not None else self.state
 
-            async def output(*args, **kwargs):
+            async def output(*args, state=None, **kwargs):
                 if inspect.iscoroutinefunction(fun):
                     await fun(self, current_state, *args, **kwargs)
                 else:
@@ -177,6 +179,8 @@ class ObserveOutput(object):
                 self.LOG.warning(
                     f"The current job state {STATE_MAPPING[self.state]} is not handler {fun.__name__} want.")
                 return
+
+            observe_obj: ObserveOutput = observe_action[self.state]
 
             # Assume at remote mode, job always running on agent,
             # then job need to output job to remote master.
@@ -188,12 +192,12 @@ class ObserveOutput(object):
                     break
 
                 # remote agent need to return output to master if remote_output is True.
-                if _self.remote_output is True:
+                if observe_obj.remote_output is True:
                     ObserveOutput._remote_output(
                         self, fun, *args, **kwargs)
 
                 # If agent_handle is False there is no need to deal with output.
-                if _self.agent_handler is True:
+                if observe_obj.agent_handler is True:
                     break
 
                 return
@@ -202,11 +206,24 @@ class ObserveOutput(object):
             ObserveOutput._put_output_handler(
                 self, output, *args, **kwargs)
 
-        # basic setting
+        # basic setting of _output_handler
+        # Notice: observe_action -> list reference
         _output_handler._observe = observe_action
         _output_handler._observer_name = fun.__name__
 
         return _output_handler
+
+    # set state and correspond ObserveOutput to action_dict
+    def set_action_dict(self, state, action_dict=None):
+        action_dict = action_dict if action_dict is not None else {}
+
+        for s in _listify(state):
+            if s in action_dict:
+                raise Exception(
+                    f'{STATE_MAPPING[s]} had already existed in action_dict.')
+            action_dict[s] = self
+
+        return action_dict
 
     # send output to remote master.
     @staticmethod
