@@ -3,6 +3,7 @@ import logging
 import json
 import asyncio
 import traceback
+from typing import Tuple
 
 from async_app_fw.lib import hub
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
@@ -92,6 +93,20 @@ class StatgeChangeAfterIsList(Exception):
 log_collect_handler = logging.getLogger('collect handler')
 
 
+def _state_change_to_key(before, after):
+    for b in _listify(before):
+        # give these exception method name.
+        if after == JOB_ANY_STATE:
+            raise StageChangeAfterIsAny()
+        if isinstance(after, list):
+            raise StatgeChangeAfterIsList()
+        if b == after:
+            raise StageChangeAssignFail()
+
+        key = f'{b}-{after}'
+    return key
+
+
 def collect_handler(cls):
     cls._handler_set = {}
     cls._action_set = {}
@@ -100,7 +115,7 @@ def collect_handler(cls):
 
     def _is_handler_or_action(handler):
         if inspect.isfunction(handler) and \
-                (hasattr(handler, '_callers') or
+                (hasattr(handler, '_state_change') or
                  hasattr(handler, '_action') or
                  hasattr(handler, '_observe')):
             return True
@@ -108,8 +123,8 @@ def collect_handler(cls):
             return False
 
     for _, handler in inspect.getmembers(cls, predicate=_is_handler_or_action):
-        if hasattr(handler, '_callers'):
-            for state_change in handler._callers.keys():
+        if hasattr(handler, '_state_change'):
+            for state_change in handler._state_change.keys():
                 handler_list = cls._handler_set.get(state_change, None)
 
                 if handler_list is not None:
@@ -241,46 +256,52 @@ class ObserveOutput(object):
             job_obj.exe_output(output_observer, job_obj.state, *args, **kwargs)
 
 
+class HandleStateChange(object):
+    def __init__(self, state_change: Tuple, end=None):
+        self.before = state_change[0]
+        self.after = state_change[1]
+        self.end = end if end is not None else self.after
 
-def handle_state_change(state_change: tuple, end=None):
-    before = state_change[0]
-    after = state_change[1]
-    end = end if end is not None else after
+    def __call__(_self, handler):
+        _self.handler = handler
+        state_change_key = _state_change_to_key(
+            _self.before, _self.after)
 
-    def _decorator(handler):
-        def _handle_state_change(self: Job, *args, **kwargs):
-            async def run_handler_change(*args, **kwargs):
+        # if handler had already decorated.
+        if hasattr(handler, '_state_change'):
+            handler._state_change[state_change_key] = _self
+            return handler
+
+        # init sate_change dict
+        state_change = {}
+        state_change[state_change_key] = _self
+
+        def _handle_state_change(self: Job, state_key, before, after, *args, **kwargs):
+            # preserve scalability
+            handle_state_change_obj = state_change[state_key]
+
+            async def handle_state_change(*args, **kwargs):
                 self.LOG.info(
                     f'Handle state change from: {STATE_MAPPING[before]} to {STATE_MAPPING[after]}>, method: < {handler.__name__} >')
-                # exception handle must implemnt.
-                if inspect.iscoroutinefunction(handler):
-                    await handler(self, *args, **kwargs)
-                else:
-                    handler(self, *args, **kwargs)
+                try:
+                    if inspect.iscoroutinefunction(handler):
+                        await handler(self, *args, **kwargs)
+                    else:
+                        handler(self, *args, **kwargs)
+                except asyncio.CancelledError:
+                    self.LOG.warning(
+                        f'State Change Handler {handler.__name__} stop running.')
+                except Exception:
+                    pass
 
-                self.change_state(end)
+                self.change_state(_self.end)
 
-            self.exe_handler(run_handler_change, None, *args, **kwargs)
+            self.exe_handler(handle_state_change, None, *args, **kwargs)
 
-        callers = {}
-
-        for b in _listify(before):
-            # give these exception method name.
-            if after == JOB_ANY_STATE:
-                raise StageChangeAfterIsAny()
-            if isinstance(after, list):
-                raise StatgeChangeAfterIsList()
-            if b == after:
-                raise StageChangeAssignFail()
-
-            key = f'{b}-{after}'
-            callers[key] = True
-
-        _handle_state_change._callers = callers
+        _handle_state_change._state_change = state_change
         _handle_state_change._handler_name = handler.__name__
 
         return _handle_state_change
-    return _decorator
 
 
 def action_handler(action, after, cancel_current_task=False):
@@ -380,10 +401,10 @@ class Job:
                     handler = self._action_set[after]
                     handler(self)
                 elif after in ACTION_RESULT:
-                    key = f'{before}-{after}'
+                    key = _state_change_to_key(before, after)
                     if key in self._handler_set:
                         for handler in self._handler_set[key]:
-                            handler(self)
+                            handler(self, key, before, after)
 
         except asyncio.CancelledError:
             self.LOG.warning('handler execute loop stop.')
