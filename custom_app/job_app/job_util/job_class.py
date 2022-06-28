@@ -458,8 +458,10 @@ class Job:
     def get_remote_output(self, state, info=None):
         args = info['args']
         kwargs = info['kwargs']
+        # assume state is the first element of args, pop state from args.
+        state = args.pop(0)
         output_handler = self._observe_name_set[kwargs.pop('observer_name')]
-        output_handler(self, *args, **kwargs)
+        output_handler(self, *args, state=state, **kwargs)
 
     def run(self):
         pass
