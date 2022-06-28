@@ -10,12 +10,12 @@ from async_util import print_loop_stack
 
 
 async def test_job(job_master_handler: JobMasterHandler):
-    # logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO)
     await asyncio.sleep(2)
-    job1 = JobCommand('ping -c 3 8.8.8.8',
+    job1 = JobCommand('ping 8.8.8.8',
                       remote_mode=True, remote_role=REMOTE_MATER)
     job_master_handler.install_job(job1, '127.0.0.1')
-    job2 = JobCommand('ping -c 5 168.95.1.1',
+    job2 = JobCommand('ping 168.95.1.1',
                       remote_mode=True, remote_role=REMOTE_MATER)
     job_master_handler.install_job(job2, '127.0.0.1')
     # self.install_job(JobCommand(
@@ -24,6 +24,10 @@ async def test_job(job_master_handler: JobMasterHandler):
     job1.run()
     job2.run()
     # self.clear_job('127.0.0.1')
+    await asyncio.sleep(5)
+    job1.delete()
+    await asyncio.sleep(5)
+    job2.delete()
 
 
 async def application_init_and_run():
