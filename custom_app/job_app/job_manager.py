@@ -40,9 +40,9 @@ class JobManager:
         job.change_state(JOB_CREATE)
 
     def del_job(self, job_id):
-        self.jobs[job_id].change_state(JOB_DELETE)
+        LOG.info(f'Delete Job {job_id}.')
         job: Job = self.jobs.pop(job_id)
-        return job.stop()
+        return job.delete()
 
     def job_state_inform(self, msg):
         logging.info(f'get inform, job_id: {msg.job_id}')
@@ -66,7 +66,3 @@ class JobManager:
     def delete_all_job(self):
         for job_id in list(self.jobs.keys()):
             self.del_job(job_id)
-
-    def delete_job(self, job_id):
-        job: Job = self.jobs.pop(job_id)
-        del job
