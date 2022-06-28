@@ -4,7 +4,7 @@ import logging
 from async_app_fw.base.app_manager import AppManager, lookup_service_brick
 from async_app_fw.lib.hub import TaskLoop, app_hub
 from custom_app.job_app.job_master_handler import JobMasterHandler
-from api_action_module import SwitchAPIAction
+from custom_app.job_app.job_util.api_action_module import SwitchAPIAction
 from custom_app.job_app.job_util.job_class import REMOTE_MATER
 from custom_app.job_app.job_util.job_request import JobRequest
 from async_util import print_loop_stack

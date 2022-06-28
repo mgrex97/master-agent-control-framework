@@ -3,6 +3,7 @@ import logging
 import json
 import asyncio
 import traceback
+from typing import Tuple
 
 from async_app_fw.lib import hub
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
@@ -92,6 +93,20 @@ class StatgeChangeAfterIsList(Exception):
 log_collect_handler = logging.getLogger('collect handler')
 
 
+def _state_change_to_key(before, after):
+    for b in _listify(before):
+        # give these exception method name.
+        if after == JOB_ANY_STATE:
+            raise StageChangeAfterIsAny()
+        if isinstance(after, list):
+            raise StatgeChangeAfterIsList()
+        if b == after:
+            raise StageChangeAssignFail()
+
+        key = f'{b}-{after}'
+    return key
+
+
 def collect_handler(cls):
     cls._handler_set = {}
     cls._action_set = {}
@@ -100,7 +115,7 @@ def collect_handler(cls):
 
     def _is_handler_or_action(handler):
         if inspect.isfunction(handler) and \
-                (hasattr(handler, '_callers') or
+                (hasattr(handler, '_state_change') or
                  hasattr(handler, '_action') or
                  hasattr(handler, '_observe')):
             return True
@@ -108,8 +123,8 @@ def collect_handler(cls):
             return False
 
     for _, handler in inspect.getmembers(cls, predicate=_is_handler_or_action):
-        if hasattr(handler, '_callers'):
-            for state_change in handler._callers.keys():
+        if hasattr(handler, '_state_change'):
+            for state_change in handler._state_change.keys():
                 handler_list = cls._handler_set.get(state_change, None)
 
                 if handler_list is not None:
@@ -134,7 +149,7 @@ def collect_handler(cls):
 
                 if observe_list is not None:
                     log_collect_handler.warning(
-                        f'There has duplicated hanlders handle same state change. {state_change}')
+                        f'There has duplicated hanlders handle same state change. {state}')
                 else:
                     observe_list = []
                     cls._observe_set.setdefault(state, observe_list)
@@ -144,97 +159,195 @@ def collect_handler(cls):
     return cls
 
 
-def observe_output(state):
-    state = _listify(state)
+class ObserveOutput(object):
+    def __init__(self, state, agent_handle=False, remote_output=True) -> None:
+        self.state = _listify(state)
+        self.agent_handler = agent_handle
+        self.remote_output = remote_output
 
-    def _decorator(fun):
-        def _observe_output(self: Job, *args, **kwargs):
-            async def output_handler(*args, **kwargs):
-                if self.remote_mode is True and self.remote_role == REMOTE_AGENT:
-                    self.remote_output(
-                        self.state, fun.__name__, *args, **kwargs)
+    # deorate observer
+    def __call__(_self, fun):
+        _self.fun = fun
+
+        # if function had already decorated.
+        if hasattr(fun, '_observe'):
+            # add state to _observe
+            _self.set_action_dict(_self.state, fun._observe)
+            # No need to create function _output_handler again.
+            return
+
+        # init observe_action, create _output_handler
+        observe_action = {}
+        _self.set_action_dict(_self.state, observe_action)
+
+        # Detect remote_mode, send output to remote master or push to jobs's _output_queue.
+        def _output_handler(self: Job, *args, state=None, **kwargs):
+            current_state = state if state is not None else self.state
+
+            async def output(*args, **kwargs):
+                if inspect.iscoroutinefunction(fun):
+                    await fun(self, current_state, *args, **kwargs)
                 else:
-                    if inspect.iscoroutinefunction(fun):
-                        await fun(*args, **kwargs)
-                    else:
-                        fun(*args, **kwargs)
+                    fun(self, current_state, *args, **kwargs)
 
-            # need to improve
-            if self.remote_mode is True and self.remote_role == REMOTE_MATER:
-                self.exe_output(output_handler, *args, **kwargs)
-            else:
-                self.exe_output(output_handler, self.state, *args, **kwargs)
+            if self.state not in observe_action:
+                self.LOG.warning(
+                    f"The current job state {STATE_MAPPING[self.state]} is not handler {fun.__name__} want.")
+                return
 
-        if not hasattr(_observe_output, '_observe'):
-            _observe_output._observe = []
+            observe_obj: ObserveOutput = observe_action[self.state]
 
-        _observe_output._observe.extend(state)
-        _observe_output._observer_name = fun.__name__
+            # Assume at remote mode, job always running on agent,
+            # then job need to output job to remote master.
+            while True:
+                if self.remote_mode is False:
+                    break
 
-        return _observe_output
-    return _decorator
+                if self.remote_role is REMOTE_MATER:
+                    break
+
+                # remote agent need to return output to master if remote_output is True.
+                if observe_obj.remote_output is True:
+                    ObserveOutput._remote_output(
+                        self, fun, *args, **kwargs)
+
+                # If agent_handle is False there is no need to deal with output.
+                if observe_obj.agent_handler is True:
+                    break
+
+                return
+
+            # Put variable and output_observer (method) into output queue.
+            ObserveOutput._put_output_handler(
+                self, output, *args, **kwargs)
+
+        # basic setting of _output_handler
+        # Notice: observe_action -> list reference
+        _output_handler._observe = observe_action
+        _output_handler._observer_name = fun.__name__
+
+        return _output_handler
+
+    # set state and correspond ObserveOutput to action_dict
+    def set_action_dict(self, state, action_dict=None):
+        action_dict = action_dict if action_dict is not None else {}
+
+        for s in _listify(state):
+            if s in action_dict:
+                raise Exception(
+                    f'{STATE_MAPPING[s]} had already existed in action_dict.')
+            action_dict[s] = self
+
+        return action_dict
+
+    # send output to remote master.
+    @staticmethod
+    def _remote_output(job_obj, fun, *args, **kwargs):
+        job_obj.remote_output(
+            job_obj.state, fun.__name__, *args, **kwargs)
+
+    # put output handler and variable to exe_output_queue
+    @staticmethod
+    def _put_output_handler(job_obj, output_observer, *args, **kwargs):
+        # need to improve
+        if job_obj.remote_mode is True and job_obj.remote_role == REMOTE_MATER:
+            job_obj.exe_output(output_observer, *args, **kwargs)
+        else:
+            job_obj.exe_output(output_observer, job_obj.state, *args, **kwargs)
 
 
-def handle_state_change(state_change: tuple, end=None):
-    before = state_change[0]
-    after = state_change[1]
-    end = end if end is not None else after
+class HandleStateChange(object):
+    def __init__(self, state_change: Tuple, end=None):
+        self.before = state_change[0]
+        self.after = state_change[1]
+        self.end = end if end is not None else self.after
 
-    def _decorator(handler):
-        def _handle_state_change(self: Job, *args, **kwargs):
-            async def run_handler_change(*args, **kwargs):
+    def __call__(_self, handler):
+        _self.handler = handler
+        state_change_key = _state_change_to_key(
+            _self.before, _self.after)
+
+        # if handler had already decorated.
+        if hasattr(handler, '_state_change'):
+            handler._state_change[state_change_key] = _self
+            return handler
+
+        # init sate_change dict
+        state_change = {}
+        state_change[state_change_key] = _self
+
+        def _handle_state_change(self: Job, state_key, before, after, *args, **kwargs):
+            # preserve scalability
+            handle_state_change_obj = state_change[state_key]
+
+            async def handle_state_change(*args, **kwargs):
                 self.LOG.info(
                     f'Handle state change from: {STATE_MAPPING[before]} to {STATE_MAPPING[after]}>, method: < {handler.__name__} >')
-                # exception handle must implemnt.
-                if inspect.iscoroutinefunction(handler):
-                    await handler(self, *args, **kwargs)
-                else:
-                    handler(self, *args, **kwargs)
+                try:
+                    if inspect.iscoroutinefunction(handler):
+                        await handler(self, *args, **kwargs)
+                    else:
+                        handler(self, *args, **kwargs)
+                except asyncio.CancelledError:
+                    self.LOG.warning(
+                        f'State Change Handler {handler.__name__} stop running.')
+                except Exception:
+                    pass
 
-                self.change_state(end)
+                self.change_state(_self.end)
 
-            self.exe_handler(run_handler_change, None, *args, **kwargs)
+            self.exe_handler(handle_state_change, None, *args, **kwargs)
 
-        callers = {}
-
-        for b in _listify(before):
-            # give these exception method name.
-            if after == JOB_ANY_STATE:
-                raise StageChangeAfterIsAny()
-            if isinstance(after, list):
-                raise StatgeChangeAfterIsList()
-            if b == after:
-                raise StageChangeAssignFail()
-
-            key = f'{b}-{after}'
-            callers[key] = True
-
-        _handle_state_change._callers = callers
+        _handle_state_change._state_change = state_change
         _handle_state_change._handler_name = handler.__name__
 
         return _handle_state_change
-    return _decorator
 
 
-def action_handler(action, after, cancel_current_task=False):
-    assert action in TAKE_ACTION
+class ActionHandler(object):
+    def __init__(self, action, after, require_before=False, cancel_current_task=False):
+        assert action in TAKE_ACTION
+        self.action = action
+        self.after = after
+        self.cancel_current_task = cancel_current_task
+        self.require_before = require_before
 
-    def _decorator(action_method):
-        def __action_handler(self: Job, *args, **kwargs):
+    def __call__(_self, handler):
+        _self.handler = handler
+
+        if hasattr(handler, '_action'):
+            raise Exception(
+                f'{handler.__name__} had already bind with an action.')
+
+        def _action_handler(self: Job, *args, **kwargs):
             before = self.state
+            cancel_task = kwargs.pop(
+                'cancel_current_task', _self.cancel_current_task)
+
+            # clear exe queue
+            if cancel_task is True:
+                self.reset_exe_loop()
+
+            action = _self.action
             if self.remote_mode is False:
                 async def run_action(*args, **kwargs):
+
+                    if _self.require_before is True:
+                        kwargs['before'] = before
+
                     self.LOG.info(
-                        f'Run action <{STATE_MAPPING[action]}>, method: <{action_method.__name__}>')
-                    if inspect.iscoroutinefunction(action_method):
-                        await action_method(self, *args, **kwargs)
+                        f'Run action <{STATE_MAPPING[action]}>, method: <{handler.__name__}>')
+                    if inspect.iscoroutinefunction(handler):
+                        await handler(self, *args, **kwargs)
                     else:
-                        action_method(self, *args, **kwargs)
+                        handler(self, *args, **kwargs)
+
+                    # if sate not change yet after action handler finished.
                     if self.state == action:
-                        self.change_state(after)
+                        self.change_state(_self.after)
 
                 self.exe_handler(
-                    run_action, action, *args, **kwargs)
+                    run_action, handler, *args, **kwargs)
                 return
 
             # remote mode is True
@@ -247,21 +360,27 @@ def action_handler(action, after, cancel_current_task=False):
                 async def run_action(*args, **kwargs):
                     self.change_state(action)
                     self.LOG.info(f'Run action <{STATE_MAPPING[action]}>')
-                    if inspect.iscoroutinefunction(action_method):
-                        await action_method(self, *args, **kwargs)
+                    if inspect.iscoroutinefunction(handler):
+                        await handler(self, *args, **kwargs)
                     else:
-                        action_method(self, *args, **kwargs)
+                        handler(self, *args, **kwargs)
 
                     if self.state == action:
-                        self.change_state(after)
+                        self.change_state(_self.after)
 
                 self.exe_handler(run_action, action, *args, **kwargs)
 
-        __action_handler._action = action
-        __action_handler._handler_name = action_method.__name__
+        _action_handler._action = _self.action
+        _action_handler._handler_name = handler.__name__
 
-        return __action_handler
-    return _decorator
+        return _action_handler
+
+
+class TaskQueueStopRunning:
+    pass
+
+
+task_stop_obj = TaskQueueStopRunning()
 
 
 class Job:
@@ -290,6 +409,10 @@ class Job:
         try:
             while True:
                 (observer, state, args, kwargs) = await self._output_queue.get()
+
+                if isinstance(observer, TaskQueueStopRunning):
+                    break
+
                 try:
                     await observer(state, *args, **kwargs)
                 except Exception:
@@ -298,28 +421,45 @@ class Job:
             pass
 
     async def _handler_exe_loop(self):
-        try:
-            while True:
+        while True:
+            try:
                 (handler, state_change_when_running, args, kwargs) = await self._handler_exe_queue.get()
+
+                if isinstance(handler, TaskQueueStopRunning):
+                    break
+
                 if state_change_when_running is not None and \
                         state_change_when_running != self.state:
                     self.change_state(state_change_when_running)
 
                 before = self.state
+
                 await handler(*args, **kwargs)
+
                 after = self.state
 
-                if after in TAKE_ACTION:
-                    handler = self._action_set[after]
-                    handler(self)
-                elif after in ACTION_RESULT:
-                    key = f'{before}-{after}'
-                    if key in self._handler_set:
-                        for handler in self._handler_set[key]:
-                            handler(self)
+                # if exe_queue is empty, automatically find next step.
+                if self._handler_exe_queue.empty():
+                    if after in TAKE_ACTION:
+                        handler = self._action_set[after]
+                        handler(self)
+                    elif after in ACTION_RESULT:
+                        key = _state_change_to_key(before, after)
+                        if key in self._handler_set:
+                            for handler in self._handler_set[key]:
+                                handler(self, key, before, after)
+            except asyncio.CancelledError:
+                self.LOG.warning('handler execute loop stop.')
 
-        except asyncio.CancelledError:
-            self.LOG.warning('handler execute loop stop.')
+    def reset_exe_loop(self):
+        try:
+            while self._handler_exe_queue.get_nowait():
+                pass
+        except asyncio.QueueEmpty:
+            pass
+        finally:
+            if self.handle_task.done() is False:
+                self.handle_task.cancel()
 
     def exe_handler(self, handler, state_change_when_hanlder_start=None, *args, **kwargs):
         self._handler_exe_queue.put_nowait(
@@ -409,7 +549,7 @@ class Job:
         args = info['args']
         kwargs = info['kwargs']
         output_handler = self._observe_name_set[kwargs.pop('observer_name')]
-        output_handler(self, *args, **kwargs)
+        output_handler(self, *args, state=state, **kwargs)
 
     def run(self):
         pass
@@ -417,8 +557,14 @@ class Job:
     def stop(self):
         pass
 
-    def delete(self):
-        pass
+    async def delete(self):
+        self.reset_exe_loop()
+        # send stop obj to both queue.
+        self.exe_handler(task_stop_obj)
+        self.exe_output(task_stop_obj, 'Delete Task loop.')
+
+        await self._handler_exe_loop
+        await self._output_handler_loop
 
     def job_info_serialize(self, output=None):
         if output is None:

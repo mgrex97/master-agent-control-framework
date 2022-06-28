@@ -5,7 +5,9 @@ import traceback
 
 from async_app_fw.lib import hub
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
-from custom_app.job_app.job_util.job_class import Job, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, action_handler, collect_handler, handle_state_change, observe_output
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, REMOTE_MATER
+from custom_app.job_app.job_util.job_class import Job, collect_handler
+from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange, ActionHandler
 
 CMD_JOB = 1
 
@@ -49,15 +51,15 @@ class JobCommand(Job):
         }
         return output
 
-    @observe_output(JOB_RUNNING)
-    def get_output(state, output):
+    @ObserveOutput(JOB_RUNNING)
+    def get_output(self, state, output):
         print(output)
 
-    @action_handler(JOB_RUN, JOB_RUNNING)
+    @ActionHandler(JOB_RUN, JOB_RUNNING)
     def run(self):
         pass
 
-    @handle_state_change((JOB_RUN, JOB_RUNNING), JOB_STOP)
+    @HandleStateChange((JOB_RUN, JOB_RUNNING), JOB_STOP)
     async def _run_command(self):
         try:
             self.__process = await asyncio.create_subprocess_shell(
@@ -114,7 +116,7 @@ class JobCommand(Job):
 
         self.std_task.setdefault(type, task)
 
-    @action_handler(JOB_STOP, JOB_STOPING)
+    @ActionHandler(JOB_STOP, JOB_STOPING, cancel_current_task=True)
     def stop(self):
         for std in (self.stdin, self.stderr, self.stdout):
             if isinstance(std, asyncio.StreamWriter):
@@ -127,7 +129,7 @@ class JobCommand(Job):
         self.stderr = None
         self.stdout = None
 
-    @handle_state_change((JOB_STOP, JOB_STOPING), JOB_STOPED)
+    @HandleStateChange((JOB_STOP, JOB_STOPING), JOB_STOPED)
     async def _subprocess_stop(self):
         process = self.__process
         self.__process = None
@@ -149,5 +151,9 @@ class JobCommand(Job):
             if not std_task.done():
                 std_task.cancel()
 
-    def __del__(self):
+    def delete(self):
         self.stop()
+        super().delete()
+
+    def __del__(self):
+        self.delete()
