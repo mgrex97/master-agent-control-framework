@@ -151,9 +151,18 @@ class JobCommand(Job):
             if not std_task.done():
                 std_task.cancel()
 
-    def delete(self):
-        self.stop()
-        super().delete()
+    @ActionHandler(JOB_DELETE, JOB_DELETED, require_before=True, cancel_current_task=True)
+    async def delete(self, before=None):
+        # append stop into handler_exe_queue
+        if before != JOB_STOPED:
+            self.stop()
+            # self.stop(cancel_current_task=False)
+            self._subprocess_stop()
+            # append delete into handler_exe_queue
+            self.delete()
+        else:
+            # wait output queue and exe handler queue stop.
+            await super().delete()
 
     def __del__(self):
         self.delete()
