@@ -184,7 +184,7 @@ class ObserveOutput(object):
         def _output_handler(self: Job, *args, state=None, **kwargs):
             current_state = state if state is not None else self.state
 
-            async def output(*args, state=None, **kwargs):
+            async def output(*args, **kwargs):
                 if inspect.iscoroutinefunction(fun):
                     await fun(self, current_state, *args, **kwargs)
                 else:
@@ -496,8 +496,6 @@ class Job:
     def get_remote_output(self, state, info=None):
         args = info['args']
         kwargs = info['kwargs']
-        # assume state is the first element of args, pop state from args.
-        state = args.pop(0)
         output_handler = self._observe_name_set[kwargs.pop('observer_name')]
         output_handler(self, *args, state=state, **kwargs)
 
