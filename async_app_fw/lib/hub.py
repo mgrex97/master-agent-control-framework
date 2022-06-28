@@ -218,14 +218,18 @@ class StreamClient(object):
 
     def connect_loop(self, handle, interval=0) -> asyncio.Task:
         async def _connect_loop(handle, interval):
-            while self._is_active:
-                result = await self.connect()
-                if result:
-                    await app_hub.spawn(handle, result[0], result[1])
+            try:
+                while self._is_active:
+                    result = await self.connect()
+                    if result:
+                        await app_hub.spawn(handle, result[0], result[1])
 
-                await asyncio.sleep(interval)
-                self.LOG.info(f'Connect again after {interval} sec.')
-            self.LOG.info(f'connect_loop stop. Get CancelledError.')
+                    await asyncio.sleep(interval)
+                    self.LOG.info(f'Connect again after {interval} sec.')
+                self.LOG.info(f'connect_loop stop. Get CancelledError.')
+            except asyncio.CancelledError:
+                self.LOG.info(f'connect_loop interrpute.')
+                pass
 
         return app_hub.spawn(_connect_loop, handle, interval)
 
