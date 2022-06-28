@@ -7,6 +7,7 @@ from time import time
 import traceback
 from typing import Awaitable
 import requests
+import urllib3
 from async_app_fw.lib.hub import app_hub
 from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPING, REMOTE_MATER, Job, action_handler, collect_handler
 from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange
@@ -18,6 +19,10 @@ POST = 'post'
 PUT = 'put'
 DELETE = 'delete'
 PATHCH = 'patch'
+
+
+# disable InsecureRequestWarning
+urllib3.disable_warnings(urllib3.connectionpool.InsecureRequestWarning)
 
 
 def __re_check_token(text):
