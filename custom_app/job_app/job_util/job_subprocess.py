@@ -5,8 +5,9 @@ import traceback
 
 from async_app_fw.lib import hub
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
-from custom_app.job_app.job_util.job_class import Job, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, action_handler, collect_handler
-from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, REMOTE_MATER
+from custom_app.job_app.job_util.job_class import Job, collect_handler
+from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange, ActionHandler
 
 CMD_JOB = 1
 
@@ -54,7 +55,7 @@ class JobCommand(Job):
     def get_output(self, state, output):
         print(output)
 
-    @action_handler(JOB_RUN, JOB_RUNNING)
+    @ActionHandler(JOB_RUN, JOB_RUNNING)
     def run(self):
         pass
 
@@ -115,7 +116,7 @@ class JobCommand(Job):
 
         self.std_task.setdefault(type, task)
 
-    @action_handler(JOB_STOP, JOB_STOPING)
+    @ActionHandler(JOB_STOP, JOB_STOPING, cancel_current_task=True)
     def stop(self):
         for std in (self.stdin, self.stderr, self.stdout):
             if isinstance(std, asyncio.StreamWriter):
@@ -150,5 +151,9 @@ class JobCommand(Job):
             if not std_task.done():
                 std_task.cancel()
 
-    def __del__(self):
+    def delete(self):
         self.stop()
+        super().delete()
+
+    def __del__(self):
+        self.delete()

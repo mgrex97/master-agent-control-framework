@@ -9,8 +9,9 @@ from typing import Awaitable
 import requests
 import urllib3
 from async_app_fw.lib.hub import app_hub
-from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPING, REMOTE_MATER, Job, action_handler, collect_handler
-from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, REMOTE_MATER
+from custom_app.job_app.job_util.job_class import Job, collect_handler
+from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange, ActionHandler
 
 REQUEST_JOB = 2
 
@@ -33,7 +34,7 @@ def __re_check_token(text):
 LOG = logging.getLogger('API Action')
 
 
-# atleast retry one
+# Atleast retry one
 def check_token(retry_login=1):
     def _decorator(func):
         async def _check_token(self, *args, **kwargs):
@@ -198,7 +199,7 @@ class JobRequest(Job):
         output['request_info'] = self.request_info
         return output
 
-    @action_handler(JOB_RUN, JOB_RUNNING)
+    @ActionHandler(JOB_RUN, JOB_RUNNING)
     def run(self):
         pass
 
@@ -246,6 +247,7 @@ class JobRequest(Job):
 
     def push_request_data_to_queue(self, type, url, data):
         assert self.retry_mode is False
+        # need to implement exception catch, if QueueFull raise.
         self.request_queue.put_nowait((type, url, data))
 
     @ObserveOutput(JOB_RUNNING)
@@ -257,17 +259,38 @@ class JobRequest(Job):
         else:
             print(result)
 
-    @action_handler(JOB_STOP, JOB_STOPING, cancel_current_task=True)
-    async def stop(self):
+    @ActionHandler(JOB_STOP, JOB_STOPING, cancel_current_task=True)
+    def stop(self):
+        # make sure all request tasks are going to cancel.
+        LOG.info(' Stop request task.')
         if self.task_dict is not None:
             # cancel, delete request task.
-            for task in self.task_dict:
+            for _, task in self.task_dict:
                 task.cancel()
-                del task
 
-            # reset task_dict
-            del self.task_dict
-            self.task_dict = None
+    @HandleStateChange((JOB_STOP, JOB_STOPING), JOB_STOPED)
+    async def wait_request_task_stop(self):
+        # wait all task is clear.
+        if self.task_dict is not None:
+            for _, task in self.task_dict:
+                await task
+
+        # reset task_dict
+        del self.task_dict
+        self.task_dict = None
+
+    @ActionHandler(JOB_DELETE, JOB_DELETED, require_before=True, cancel_current_task=True)
+    async def delete(self, before=None):
+        # append stop into handler_exe_queue
+        if before != JOB_STOPED:
+            self.stop()
+            # self.stop(cancel_current_task=False)
+            self.wait_request_task_stop()
+            # append delete into handler_exe_queue
+            self.delete()
+        else:
+            # wait output queue and exe handler queue stop.
+            await super().delete()
 
     def __del__(self):
-        pass
+        self.delete()
