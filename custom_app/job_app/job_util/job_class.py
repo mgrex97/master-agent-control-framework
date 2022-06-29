@@ -249,11 +249,7 @@ class ObserveOutput(object):
     # put output handler and variable to exe_output_queue
     @staticmethod
     def _put_output_handler(job_obj, output_observer, *args, **kwargs):
-        # need to improve
-        if job_obj.remote_mode is True and job_obj.remote_role == REMOTE_MATER:
-            job_obj.exe_output(output_observer, *args, **kwargs)
-        else:
-            job_obj.exe_output(output_observer, job_obj.state, *args, **kwargs)
+        job_obj.exe_output(output_observer, *args, **kwargs)
 
 
 class HandleStateChange(object):
@@ -408,13 +404,13 @@ class Job:
     async def _output_handler_loop(self):
         try:
             while True:
-                (observer, state, args, kwargs) = await self._output_queue.get()
+                (observer, args, kwargs) = await self._output_queue.get()
 
                 if isinstance(observer, TaskQueueStopRunning):
                     break
 
                 try:
-                    await observer(state, *args, **kwargs)
+                    await observer(*args, **kwargs)
                 except Exception:
                     print(traceback.format_exc())
         except asyncio.CancelledError:
@@ -465,9 +461,9 @@ class Job:
         self._handler_exe_queue.put_nowait(
             (handler, state_change_when_hanlder_start, args, kwargs))
 
-    def exe_output(self, output_handler, state, *args, **kwargs):
+    def exe_output(self, output_handler, *args, **kwargs):
         self._output_queue.put_nowait(
-            (output_handler, state, args, kwargs))
+            (output_handler, args, kwargs))
 
     @classmethod
     def create_job_by_job_info(cls, connection, job_info, job_id, remote_role=None):
