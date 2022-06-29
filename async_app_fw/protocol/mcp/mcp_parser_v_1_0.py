@@ -11,6 +11,8 @@ LOG = logging.getLogger('mcp_v_1_0')
 
 _MSG_PARSERS = {}
 
+VERSION_ID = 1
+
 
 def _set_msg_type(msg_type):
     '''Annotate corresponding MCP message type'''
@@ -36,10 +38,11 @@ def _register_parser(cls):
     return cls
 
 
-@mcp_parser.register_msg_parser()
-def msg_parser(connection, msg_type, msg_len, xid, buf):
+@mcp_parser.register_msg_parser(keyword=VERSION_ID)
+def msg_parser(connection, msg_type, msg_len, version, xid, buf):
+    assert version == VERSION_ID
     parser = _MSG_PARSERS.get(msg_type)
-    return parser(connection, msg_type, msg_len, xid, buf)
+    return parser(connection, msg_type, msg_len, version, xid, buf)
 
 
 @_register_parser
@@ -50,9 +53,9 @@ class MCPHello(MCPMsgBase):
         self.connection_id = connection_id
 
     @classmethod
-    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
         msg = super(MCPHello, cls).parser(
-            mcp_connection, msg_type, msg_len, xid, buf)
+            mcp_connection, msg_type, msg_len, version, xid, buf)
 
         (msg.connection_id, ) = struct.unpack_from(
             mcproto.MCP_HELLO_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
@@ -73,9 +76,9 @@ class MCPJobIDWithInfo(MCPMsgBase):
         self.job_info = job_info
 
     @classmethod
-    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
         msg = super(MCPJobIDWithInfo, cls).parser(
-            mcp_connection, msg_type, msg_len, xid, buf)
+            mcp_connection, msg_type, msg_len, version, xid, buf)
 
         (msg.job_id, msg.job_info_len) = struct.unpack_from(
             mcproto.MCP_JOB_ID_WITH_INFO_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
@@ -127,9 +130,9 @@ class MCPJobCreateRequest(MCPMsgBase):
         self.job_info = job_info
 
     @classmethod
-    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
         msg = super(MCPJobCreateRequest, cls).parser(
-            mcp_connection, msg_type, msg_len, xid, buf)
+            mcp_connection, msg_type, msg_len, version, xid, buf)
 
         (msg.timeout, msg.job_info_len) = struct.unpack_from(
             mcproto.MCP_JOB_CREATE_REQUEST_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
@@ -175,9 +178,9 @@ class MCPJobACK(MCPMsgBase):
         self.job_id = job_id
 
     @classmethod
-    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
         msg = super(MCPJobACK, cls).parser(
-            mcp_connection, msg_type, msg_len, xid, buf)
+            mcp_connection, msg_type, msg_len, version, xid, buf)
 
         (msg.job_id, ) = struct.unpack_from(
             mcproto.MCP_JOB_ACK_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
@@ -204,9 +207,9 @@ class MCPJobStateChange(MCPMsgBase):
         self.info_len = None
 
     @classmethod
-    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
         msg = super(MCPJobStateChange, cls).parser(
-            mcp_connection, msg_type, msg_len, xid, buf)
+            mcp_connection, msg_type, msg_len, version, xid, buf)
 
         (msg.job_id, msg.state_change, msg.info_len) = struct.unpack_from(
             mcproto.MCP_JOB_STATE_CHANGE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
@@ -263,9 +266,9 @@ class MCPJobOutput(MCPMsgBase):
         self.info_len = None
 
     @classmethod
-    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
         msg = super(MCPJobOutput, cls).parser(
-            mcp_connection, msg_type, msg_len, xid, buf)
+            mcp_connection, msg_type, msg_len, version, xid, buf)
 
         (msg.job_id, msg.state, msg.info_len) = struct.unpack_from(
             mcproto.MCP_JOB_STATE_CHANGE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
@@ -312,9 +315,9 @@ class MCPJobDeleteReply(MCPMsgBase):
         self.job_id = job_id
 
     @classmethod
-    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
         msg = super(MCPJobDeleteReply, cls).parser(
-            mcp_connection, msg_type, msg_len, xid, buf)
+            mcp_connection, msg_type, msg_len, version, xid, buf)
 
         (msg.job_id) = struct.unpack_from(
             mcproto.MCP_JOB_DELETE_REPLY_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
@@ -337,9 +340,9 @@ class MCPJobDeleteRequest(MCPMsgBase):
         self.job_id = job_id
 
     @classmethod
-    def parser(cls, mcp_connection, msg_type, msg_len, xid, buf):
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
         msg = super(MCPJobDeleteRequest, cls).parser(
-            mcp_connection, msg_type, msg_len, xid, buf)
+            mcp_connection, msg_type, msg_len, version, xid, buf)
 
         (msg.job_id) = struct.unpack_from(
             mcproto.MCP_JOB_DELETE_REQUEST_STR, msg.buf, mcproto.MCP_HEADER_SIZE)

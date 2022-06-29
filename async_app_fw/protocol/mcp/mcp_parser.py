@@ -38,7 +38,7 @@ def register_msg_parser(keyword='not implement'):
 _MSG_PARSERS = {}
 
 
-def msg(connection, msg_type, msg_len, xid, buf):
+def msg(connection, msg_type, msg_len, version, xid, buf):
     exp = None
 
     try:
@@ -46,10 +46,10 @@ def msg(connection, msg_type, msg_len, xid, buf):
     except AssertionError:
         exp = McpMsgBufferdLessThanMsgLength(len(buf), len(msg_len))
 
-    msg_parser = _MSG_PARSERS.get('not implement')
+    msg_parser = _MSG_PARSERS.get(version)
 
     try:
-        msg = msg_parser(connection, msg_type, msg_len, xid, buf)
+        msg = msg_parser(connection, msg_type, msg_len, version, xid, buf)
     except Exception as e:
         LOG.exception(
             'Encountered an error while parsing MachineControl packet from test device.')
@@ -75,14 +75,16 @@ class MCPMsgBase(object):
         self.connection = connection
         self.msg_type = None
         self.msg_len = None
+        self.version = None
         self.xid = None
         self.buf = None
 
-    def set_headers(self, msg_type, msg_len, xid):
+    def set_headers(self, msg_type, msg_len, version, xid):
         assert msg_type == self.cls_msg_type
 
         self.msg_type = msg_type
         self.msg_len = msg_len
+        self.version = version
         self.xid = xid
 
     def set_xid(self, xid):
@@ -92,14 +94,15 @@ class MCPMsgBase(object):
         self.buf = bytes(buf)
 
     @classmethod
-    def parser(cls, connection, msg_type, msg_len, xid, buf):
+    def parser(cls, connection, msg_type, msg_len, version, xid, buf):
         msg_ = cls(connection)
         msg_.set_headers(msg_type, msg_len,
-                         xid)
+                         version, xid)
         msg_.set_buf(buf)
         return msg_
 
     def _serialize_pre(self):
+        self.version = self.connection.mcproto_parser.VERSION_ID
         self.msg_type = self.cls_msg_type
         self.buf = bytearray(MCP_HEADER_SIZE)
 
@@ -115,7 +118,7 @@ class MCPMsgBase(object):
 
         struct.pack_into(MCP_HEADER_PACK_STR,
                          self.buf, 0,
-                         self.msg_type, self.msg_len, self.xid)
+                         self.msg_type, self.msg_len, self.version, self.xid)
 
     def _serialize_body(self):
         pass

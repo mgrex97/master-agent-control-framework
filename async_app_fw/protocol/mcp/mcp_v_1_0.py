@@ -1,7 +1,7 @@
 MAX_XID = 0xffffffff
 
-MCP_HEADER_PACK_STR = '!HII'
-MCP_HEADER_SIZE = 10
+MCP_HEADER_PACK_STR = '!HIBI'
+MCP_HEADER_SIZE = 11
 
 # enum mcp_type
 MCP_HELLO = 0
