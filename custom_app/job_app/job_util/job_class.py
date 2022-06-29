@@ -292,7 +292,7 @@ class HandleStateChange(object):
 
                 self.change_state(_self.end)
 
-            self.exe_handler(handle_state_change, None, *args, **kwargs)
+            self.exe_handler(handle_state_change, *args, **kwargs)
 
         _handle_state_change._state_change = state_change
         _handle_state_change._handler_name = handler.__name__
@@ -342,8 +342,12 @@ class ActionHandler(object):
                     if self.state == action:
                         self.change_state(_self.after)
 
+                # bind action to method run_action
+                # when _handler_exe_loop get handler, it will find _action is exist or not.
+                # if _action exist, _handler_exe_loop is going to change state depend _action.
+                run_action._action = action
                 self.exe_handler(
-                    run_action, handler, *args, **kwargs)
+                    run_action, *args, **kwargs)
                 return
 
             # remote mode is True
@@ -364,7 +368,8 @@ class ActionHandler(object):
                     if self.state == action:
                         self.change_state(_self.after)
 
-                self.exe_handler(run_action, action, *args, **kwargs)
+                run_action._action = action
+                self.exe_handler(run_action, *args, **kwargs)
 
         _action_handler._action = _self.action
         _action_handler._handler_name = handler.__name__
@@ -419,20 +424,22 @@ class Job:
     async def _handler_exe_loop(self):
         while True:
             try:
-                (handler, state_change_when_running, args, kwargs) = await self._handler_exe_queue.get()
+                (handler, args, kwargs) = await self._handler_exe_queue.get()
 
                 if isinstance(handler, TaskQueueStopRunning):
                     break
 
-                if state_change_when_running is not None and \
-                        state_change_when_running != self.state:
-                    self.change_state(state_change_when_running)
+                if hasattr(handler, '_action') and handler._action != self.state:
+                    self.change_state(handler._action)
 
                 before = self.state
 
                 await handler(*args, **kwargs)
 
                 after = self.state
+
+                self.LOG.debug(
+                    f'State Change after handler {handler.__name__} end:  {STATE_MAPPING[before]} -> {STATE_MAPPING[after]}')
 
                 # if exe_queue is empty, automatically find next step.
                 if self._handler_exe_queue.empty():
@@ -457,9 +464,9 @@ class Job:
             if self.handle_task.done() is False:
                 self.handle_task.cancel()
 
-    def exe_handler(self, handler, state_change_when_hanlder_start=None, *args, **kwargs):
+    def exe_handler(self, handler, *args, **kwargs):
         self._handler_exe_queue.put_nowait(
-            (handler, state_change_when_hanlder_start, args, kwargs))
+            (handler, args, kwargs))
 
     def exe_output(self, output_handler, *args, **kwargs):
         self._output_queue.put_nowait(
