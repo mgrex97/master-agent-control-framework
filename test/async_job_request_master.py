@@ -32,7 +32,7 @@ async def test_job(job_master_handler: JobMasterHandler):
                       remote_mode=True, remote_role=REMOTE_MATER)
 
     request_info_rstp_role = {
-        'running_times': 5,
+        'running_times': 100,
         'retry_mode': True,
         'retry_data': {
             'type': 'get',
@@ -51,6 +51,9 @@ async def test_job(job_master_handler: JobMasterHandler):
     job1.run()
     job2.run()
     # self.clear_job('127.0.0.1')
+    await asyncio.sleep(3)
+    job1.delete()
+    job2.delete()
 
 
 async def application_init_and_run():
