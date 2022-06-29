@@ -283,11 +283,11 @@ class JobRequest(Job):
     async def delete(self, before=None):
         # append stop into handler_exe_queue
         if before != JOB_STOPED:
-            self.stop()
-            # self.stop(cancel_current_task=False)
+            # append stop aciton into handler_exe_queue
+            self.stop(cancel_current_task=False)
             self.wait_request_task_stop()
-            # append delete into handler_exe_queue
-            self.delete()
+            # append delete aciton into handler_exe_queue
+            self.delete(cancel_current_task=False)
         else:
             # wait output queue and exe handler queue stop.
             await super().delete()
