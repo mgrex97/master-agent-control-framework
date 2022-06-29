@@ -155,11 +155,10 @@ class JobCommand(Job):
     async def delete(self, before=None):
         # append stop into handler_exe_queue
         if before != JOB_STOPED:
-            self.stop()
-            # self.stop(cancel_current_task=False)
+            self.stop(cancel_current_task=False)
             self._subprocess_stop()
             # append delete into handler_exe_queue
-            self.delete()
+            self.delete(cancel_current_task=False)
         else:
             # wait output queue and exe handler queue stop.
             await super().delete()
