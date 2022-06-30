@@ -120,6 +120,7 @@ class JobTshark(Job):
     def __init__(self, tshark_options, connection=None, timeout=60, state_inform_interval=5, remote_mode=False, remote_role=None):
         super().__init__(connection, timeout, state_inform_interval, remote_mode, remote_role)
         self.tshark_options = tshark_options
+        self.output_method = None
 
         if remote_mode is True and remote_role == REMOTE_MATER:
             return
@@ -132,6 +133,9 @@ class JobTshark(Job):
         output = super().job_info_serialize()
         output['tshark_options'] = self.tshark_options
         return output
+
+    def set_output_method(self, output_method):
+        self.output_method = output_method
 
     @classmethod
     def create_job_by_job_info(cls, job_info, connection, remote_role=None):
@@ -156,7 +160,17 @@ class JobTshark(Job):
         else:
             packet = packet_from_xml_packet(
                 packet_bytes, **unpack_info['input'])
-        print(packet)
+
+        if self.output_method is not None:
+            tshark_info = {
+                'tshark_options': self.tshark_options
+            }
+            if self.connection is not None:
+                tshark_info['address'] = self.connection.address[0]
+
+            self.output_method(tshark_info, packet)
+        else:
+            print(packet)
 
     @ActionHandler(JOB_STOP, JOB_STOPED, cancel_current_task=True)
     async def stop(self):
@@ -166,10 +180,10 @@ class JobTshark(Job):
     async def delete(self, before=None):
         # append stop into handler_exe_queue
         if before != JOB_STOPED:
-            self.stop(cancel_current_task=False)
+            self.stop(cancel_current_task=True)
             # append delete into handler_exe_queue
             self.delete(cancel_current_task=False)
             await asyncio.sleep(4)
         else:
             # wait output queue and exe handler queue stop.
-            await super().delete()
+            super().delete()
