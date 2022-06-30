@@ -1,14 +1,11 @@
 import asyncio
-from struct import pack
 import traceback
 import pyshark
-from pyshark.packet.packet import Packet
 from pyshark.capture.capture import Capture, packet_from_json_packet, packet_from_xml_packet
 from pyshark.capture.capture import StopCapture
 from async_app_fw.lib.hub import app_hub
 from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, REMOTE_MATER, STATE_MAPPING, collect_handler
 from custom_app.job_app.job_util.job_class import Job, ActionHandler, HandleStateChange, ObserveOutput
-from custom_app.job_app.job_util.job_subprocess import JobCommand
 
 
 class CustomLiveCapture(pyshark.LiveCapture):
