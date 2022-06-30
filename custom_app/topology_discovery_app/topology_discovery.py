@@ -143,7 +143,7 @@ class TopologyDiscovery(BaseApp):
         })
 
         lldp_tshark_opt = dict({
-            'interface': 'en9',
+            'interface': 'eth0',
             'bpf_filter': 'ether proto 0x88cc',
             'use_json': True
         })
