@@ -28,15 +28,16 @@ class MachineControlMasterController(object):
 
 class MasterConnection(MachineConnection):
     # serial number
-    machine_id = 1
+    MACHINE_ID = 0
 
     def __init__(self, socket, address, mcp_brick_name='mcp_master_handler'):
         super(MasterConnection, self).__init__(
             socket, address, mcp_brick_name=mcp_brick_name)
 
-    def _get_new_machine_id(self):
-        m_id = self.machine_id
-        self.machine_id = self.machine_id + 1
+    @classmethod
+    def _get_new_machine_id(cls):
+        m_id = cls.MACHINE_ID
+        cls.MACHINE_ID = cls.MACHINE_ID + 1
         return m_id
 
     async def serve(self):
