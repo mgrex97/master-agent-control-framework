@@ -163,7 +163,7 @@ class TopologyDiscovery(BaseApp):
                 lldp_request_opt, remote_mode=True, remote_role=REMOTE_MATER)
             job.set_output_method(self.lldp_request_handler)
             self.agent_sw_ip_mapping[address]['job_request'] = job
-            # job_app.install_job(job, address)
+            job_app.install_job(job, address)
 
             # create tshark job
             job_t = JobTshark(tshark_options=lldp_tshark_opt,
