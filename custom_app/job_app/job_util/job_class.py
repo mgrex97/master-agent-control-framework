@@ -535,6 +535,9 @@ class Job:
             self.LOG.info(
                 f'State Change From Remote: {STATE_MAPPING[self.state]}  -> {STATE_MAPPING[after]}')
             self.state = after
+
+            if self.state == JOB_DELETED:
+                self.delete()
         elif self.remote_role == REMOTE_AGENT:
             if after in TAKE_ACTION:
                 # exe action
