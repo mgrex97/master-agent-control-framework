@@ -145,7 +145,10 @@ class JobTshark(Job):
 
     @HandleStateChange((JOB_RUN, JOB_RUNNING), JOB_STOP)
     async def tshark_running(self):
-        await self.capture.sniff(self.tshark_output_preprocess)
+        try:
+            await self.capture.sniff(self.tshark_output_preprocess)
+        except asyncio.CancelledError:
+            self.LOG.warning("Stop sniff packet.")
 
     @ObserveOutput(JOB_RUNNING, agent_handle=False, remote_output=True)
     def tshark_output_preprocess(self, state, packet_str, unpack_info):
@@ -171,7 +174,10 @@ class JobTshark(Job):
 
     @ActionHandler(JOB_STOP, JOB_STOPED, cancel_current_task=True)
     async def stop(self):
-        await self.capture.close()
+        try:
+            await self.capture.close()
+        except Exception:
+            self.LOG.warning(f'Stop failed\n {traceback.format_exc()}')
 
     @ActionHandler(JOB_DELETE, JOB_DELETED, require_before=True, cancel_current_task=True)
     async def delete(self, before=None):
@@ -180,7 +186,6 @@ class JobTshark(Job):
             self.stop(cancel_current_task=True)
             # append delete into handler_exe_queue
             self.delete(cancel_current_task=False)
-            await asyncio.sleep(4)
         else:
             # wait output queue and exe handler queue stop.
             super().delete()
