@@ -316,7 +316,6 @@ class ActionHandler(object):
                 f'{handler.__name__} had already bind with an action.')
 
         def _action_handler(self: Job, *args, **kwargs):
-            before = self.state
             cancel_task = kwargs.pop(
                 'cancel_current_task', _self.cancel_current_task)
 
@@ -325,12 +324,9 @@ class ActionHandler(object):
                 self.reset_exe_loop()
 
             action = _self.action
+
             if self.remote_mode is False:
                 async def run_action(*args, **kwargs):
-
-                    if _self.require_before is True:
-                        kwargs['before'] = before
-
                     self.LOG.info(
                         f'Run action <{STATE_MAPPING[action]}>, method: <{handler.__name__}>')
                     if inspect.iscoroutinefunction(handler):
@@ -346,6 +342,7 @@ class ActionHandler(object):
                 # when _handler_exe_loop get handler, it will find _action is exist or not.
                 # if _action exist, _handler_exe_loop is going to change state depend _action.
                 run_action._action = action
+                run_action._action_opt = _self
                 self.exe_handler(
                     run_action, *args, **kwargs)
                 return
@@ -369,6 +366,7 @@ class ActionHandler(object):
                         self.change_state(_self.after)
 
                 run_action._action = action
+                run_action._action_opt = _self
                 self.exe_handler(run_action, *args, **kwargs)
 
         _action_handler._action = _self.action
@@ -429,7 +427,13 @@ class Job:
                 if isinstance(handler, TaskQueueStopRunning):
                     break
 
+                # is action handler
                 if hasattr(handler, '_action') and handler._action != self.state:
+                    # _action_opt is instance of ActionHandler
+                    # if action require before state
+                    if handler._action_opt.require_before is True:
+                        # set state to kwargs.
+                        kwargs['before'] = self.state
                     self.change_state(handler._action)
 
                 before = self.state
