@@ -417,7 +417,7 @@ class Job:
                 except Exception:
                     print(traceback.format_exc())
         except asyncio.CancelledError:
-            pass
+            self.LOG.info('task <output handler loop> stop running.')
 
     async def _handler_exe_loop(self):
         while True:
@@ -425,6 +425,7 @@ class Job:
                 (handler, args, kwargs) = await self._handler_exe_queue.get()
 
                 if isinstance(handler, TaskQueueStopRunning):
+                    self.LOG.info('task <Handler exe loop> stop running.')
                     break
 
                 # is action handler
@@ -564,14 +565,18 @@ class Job:
     def stop(self):
         pass
 
-    async def delete(self):
+    # delete task: _output_handler_loop and _handler_exe_loop
+    def delete(self):
         self.reset_exe_loop()
         # send stop obj to both queue.
+        # when handle_task receive CancelledError, it is not going to jump out from loop,
+        # if we want stop handle_task we need to push obj TaskQueueStopRunning,
+        # handle_task will detect the obj and break the while loop.
         self.exe_handler(task_stop_obj)
-        self.exe_output(task_stop_obj, 'Delete Task loop.')
 
-        await self._handler_exe_loop
-        await self._output_handler_loop
+        # when output_loop receive CancelledError the task will directly stop looping.
+        if self.output_loop.done() is False:
+            self.output_loop.cancel()
 
     def job_info_serialize(self, output=None):
         if output is None:
