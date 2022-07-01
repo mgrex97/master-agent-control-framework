@@ -410,7 +410,7 @@ class Job:
                 (observer, args, kwargs) = await self._output_queue.get()
 
                 if isinstance(observer, TaskQueueStopRunning):
-                    break
+                    return
 
                 try:
                     await observer(*args, **kwargs)
@@ -426,7 +426,7 @@ class Job:
 
                 if isinstance(handler, TaskQueueStopRunning):
                     self.LOG.info('task <Handler exe loop> stop running.')
-                    break
+                    return
 
                 # is action handler
                 if hasattr(handler, '_action') and handler._action != self.state:
