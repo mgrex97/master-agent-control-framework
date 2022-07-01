@@ -176,5 +176,6 @@ class TopologyDiscovery(BaseApp):
     def job_manager_delete(self, ev):
         address = ev.address
 
-        self.agent_sw_ip_mapping[address]['job_request'] = None
-        self.agent_sw_ip_mapping[address]['running'] = False
+        if address in self.agent_sw_ip_mapping:
+            self.agent_sw_ip_mapping[address]['job_request'] = None
+            self.agent_sw_ip_mapping[address]['running'] = False
