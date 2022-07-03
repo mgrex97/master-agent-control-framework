@@ -62,10 +62,10 @@ STATE_MAPPING = {
     14: "JOB_OUTPUT"
 }
 
-TAKE_ACTION = (JOB_CREATE, JOB_RUN, JOB_STOP, JOB_DELETE)
-ACTION_RESULT = (JOB_CREATED, JOB_RUNNING, JOB_FAIELD,
-                 JOB_FINISHED, JOB_DELETEING, JOB_DELETED,
-                 JOB_STOPING, JOB_STOPED, JOB_OUTPUT)
+STATE_ACTION = (JOB_CREATE, JOB_RUN, JOB_STOP, JOB_DELETE)
+STATE_TRANSITION = (JOB_CREATED, JOB_RUNNING, JOB_FAIELD,
+                    JOB_FINISHED, JOB_DELETEING, JOB_DELETED,
+                    JOB_STOPING, JOB_STOPED, JOB_OUTPUT)
 
 
 LOG = logging.getLogger('custom_app.job_app.jog_class')
@@ -290,7 +290,7 @@ class HandleStateChange(object):
                 except Exception:
                     pass
 
-                self.change_state(_self.end)
+                    self.change_state(_self.end)
 
             self.exe_handler(handle_state_change, *args, **kwargs)
 
@@ -302,7 +302,7 @@ class HandleStateChange(object):
 
 class ActionHandler(object):
     def __init__(self, action, after, require_before=False, cancel_current_task=False):
-        assert action in TAKE_ACTION
+        assert action in STATE_ACTION
         self.action = action
         self.after = after
         self.cancel_current_task = cancel_current_task
@@ -339,7 +339,7 @@ class ActionHandler(object):
                         self.change_state(_self.after)
 
                 # bind action to method run_action
-                # when _handler_exe_loop get handler, it will find _action is exist or not.
+                # when _handler_exe_loop get run_action, it will detect _action is exist or not frist.
                 # if _action exist, _handler_exe_loop is going to change state depend _action.
                 run_action._action = action
                 run_action._action_opt = _self
@@ -350,7 +350,7 @@ class ActionHandler(object):
             # remote mode is True
             if self.remote_role == REMOTE_MATER:
                 self.LOG.info(f'Remotely Run action <{STATE_MAPPING[action]}>')
-                # The action is already ensured belong to TAKE_ACTION.
+                # The action is already ensured belong to STATE_ACTION.
                 # send action to remote
                 self.change_state(action)
             elif self.remote_role == REMOTE_AGENT:
@@ -390,8 +390,8 @@ class Job:
         self.connection: MachineConnection = connection
         self.state = JOB_INIT
         self.remote_mode = remote_mode
-        self.handle_task = hub.app_hub.spawn(self._handler_exe_loop)
-        self.output_loop = hub.app_hub.spawn(self._output_handler_loop)
+        self.handler_loop_task = hub.app_hub.spawn(self._handler_exe_loop)
+        self.output_loop_task = hub.app_hub.spawn(self._output_handler_loop)
         self.timeout = timeout
         self.state_inform_interval = state_inform_interval
         self._handler_exe_queue = asyncio.Queue()
@@ -448,10 +448,10 @@ class Job:
 
                 # if exe_queue is empty, automatically find next step.
                 if self._handler_exe_queue.empty():
-                    if after in TAKE_ACTION:
+                    if after in STATE_ACTION:
                         handler = self._action_set[after]
                         handler(self)
-                    elif after in ACTION_RESULT:
+                    elif after in STATE_TRANSITION:
                         key = _state_change_to_key(before, after)
                         if key in self._handler_set:
                             for handler in self._handler_set[key]:
@@ -466,8 +466,9 @@ class Job:
         except asyncio.QueueEmpty:
             pass
         finally:
-            if self.handle_task.done() is False:
-                self.handle_task.cancel()
+            if self.handler_loop_task.done() is False:
+                # Exit from current running corotine.
+                self.handler_loop_task.cancel()
 
     def exe_handler(self, handler, *args, **kwargs):
         self._handler_exe_queue.put_nowait(
@@ -539,13 +540,13 @@ class Job:
             if self.state == JOB_DELETED:
                 self.delete()
         elif self.remote_role == REMOTE_AGENT:
-            if after in TAKE_ACTION:
+            if after in STATE_ACTION:
                 # exe action
                 if after in self._action_set:
                     self._action_set[after](self)
                 else:
                     self.change_state(after)
-            elif after in ACTION_RESULT:
+            elif after in STATE_TRANSITION:
                 # raise error
                 pass
 
@@ -573,7 +574,7 @@ class Job:
         self.reset_exe_loop()
         # send stop obj to both queue.
         # when handle_task receive CancelledError, it is not going to jump out from loop,
-        # if we want stop handle_task we need to push obj TaskQueueStopRunning,
+        # Push obj TaskQueueStopRunning into _handler_exe_queue, this obj is going to inform _handler_exe_loop stop running.
         # handle_task will detect the obj and break the while loop.
         self.exe_handler(task_stop_obj)
 
