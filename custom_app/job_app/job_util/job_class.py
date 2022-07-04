@@ -341,7 +341,6 @@ class ActionHandler(object):
                 # bind action to method run_action
                 # when _handler_exe_loop get run_action, it will detect _action is exist or not frist.
                 # if _action exist, _handler_exe_loop is going to change state depend _action.
-                run_action._action = action
                 run_action._action_opt = _self
                 self.exe_handler(
                     run_action, *args, **kwargs)
@@ -365,7 +364,6 @@ class ActionHandler(object):
                     if self.state == action:
                         self.change_state(_self.after)
 
-                run_action._action = action
                 run_action._action_opt = _self
                 self.exe_handler(run_action, *args, **kwargs)
 
@@ -428,14 +426,14 @@ class Job:
                     self.LOG.info('task <Handler exe loop> stop running.')
                     return
 
-                # is action handler
-                if hasattr(handler, '_action') and handler._action != self.state:
+                # handler has attr _action.
+                if (action_opt := getattr(handler, '_action_opt', None)):
                     # _action_opt is instance of ActionHandler
                     # if action require before state
-                    if handler._action_opt.require_before is True:
+                    if action_opt.require_before is True:
                         # set state to kwargs.
                         kwargs['before'] = self.state
-                    self.change_state(handler._action)
+                    self.change_state(action_opt.action)
 
                 before = self.state
 
