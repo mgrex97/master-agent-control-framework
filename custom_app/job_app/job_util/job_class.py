@@ -577,8 +577,8 @@ class Job:
         self.exe_handler(task_stop_obj)
 
         # when output_loop receive CancelledError the task will directly stop looping.
-        if self.output_loop.done() is False:
-            self.output_loop.cancel()
+        if self.output_loop_task.done() is False:
+            self.output_loop_task.cancel()
 
     def job_info_serialize(self, output=None):
         if output is None:
