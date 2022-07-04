@@ -108,10 +108,10 @@ def _state_change_to_key(before, after):
 
 
 def collect_handler(cls):
-    cls._handler_set = {}
-    cls._action_set = {}
-    cls._observe_set = {}
-    cls._observe_name_set = {}
+    _handler_set = {}
+    _action_set = {}
+    _observe_set = {}
+    _observe_name_set = {}
 
     def _is_handler_or_action(handler):
         if inspect.isfunction(handler) and \
@@ -123,38 +123,44 @@ def collect_handler(cls):
             return False
 
     for _, handler in inspect.getmembers(cls, predicate=_is_handler_or_action):
-        if hasattr(handler, '_state_change'):
-            for state_change in handler._state_change.keys():
-                handler_list = cls._handler_set.get(state_change, None)
+        if (change_handler := getattr(handler, '_state_change', None)):
+            for state_change in change_handler.keys():
+                handler_list = _handler_set.get(state_change, None)
 
                 if handler_list is not None:
                     log_collect_handler.warning(
                         f'There has duplicated hanlders handle same state change. {state_change}')
                 else:
                     handler_list = []
-                    cls._handler_set.setdefault(state_change, handler_list)
+                    _handler_set.setdefault(state_change, handler_list)
 
                 handler_list.append(handler)
-        elif hasattr(handler, '_action'):
-            cls._action_set[handler._action] = handler
+        elif (action := getattr(handler, '_action', None)):
+            _action_set[action] = handler
         elif hasattr(handler, '_observe'):
-            if handler._observer_name in cls._observe_name_set:
+            observer_name = handler._observer_name
+            if observer_name in _observe_name_set:
                 raise Exception(
-                    f"There already exist a observer with name '{handler._observer_name}'.")
+                    f"There already exist a observer with name '{observer_name}'.")
 
-            cls._observe_name_set[handler._observer_name] = handler
+            _observe_name_set[observer_name] = handler
 
             for state in handler._observe:
-                observe_list = cls._observe_set.get(state, None)
+                observe_list = _observe_set.get(state, None)
 
                 if observe_list is not None:
                     log_collect_handler.warning(
                         f'There has duplicated hanlders handle same state change. {state}')
                 else:
                     observe_list = []
-                    cls._observe_set.setdefault(state, observe_list)
+                    _observe_set.setdefault(state, observe_list)
 
                 observe_list.append(handler)
+
+    cls._handler_set = _handler_set
+    cls._action_set = _action_set
+    cls._observe_set = _observe_set
+    cls._observe_name_set = _observe_name_set
 
     return cls
 
