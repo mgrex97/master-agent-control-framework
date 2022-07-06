@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from async_app_fw.event.event import EventBase
+from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
+from async_app_fw.event.event import EventBase, EventReplyBase, EventRequestBase
 from async_app_fw.lib import hub
 from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
 from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, Job
@@ -16,6 +17,8 @@ _REQUIRED_APP = [
 
 LOG = logging.getLogger('custom_app.job_app.jog_master_handler')
 
+APP_NAME = 'job_master_handler'
+
 
 class EventJobManagerReady(EventBase):
     def __init__(self, job_app, address):
@@ -30,58 +33,97 @@ class EventJobManagerDelete(EventBase):
         self.address = address
 
 
+JOB_CREATE_SUCCESS = 0
+JOB_CREATE_FAIL = 1
+
+
+class RequestJobCreate(EventRequestBase):
+    def __init__(self, job, address=None, timeout=None, stamp=''):
+        super().__init__()
+        self.dst = APP_NAME
+        self.job = job
+        self.address = address
+        self.timeout = timeout
+        self.stamp = stamp
+
+
+class ReplyJobCreate(EventReplyBase):
+    def __init__(self, dst, job, address, create_result, stamp):
+        super().__init__(dst)
+        self.create_result = create_result
+        self.job = job
+        self.address = address
+        self.stamp = stamp
+
+    @classmethod
+    def create_by_request(cls, req, create_result):
+        return cls(req.src, req.job, req.address, create_result, req.stamp)
+
+
+class CreateRequestManager():
+    def __init__(self, address) -> None:
+        self.address = address
+        self.xid_to_job = {}
+
+    def add_request(self, xid, req):
+        # check duplicate xid
+        assert xid not in self.xid_to_job
+        self.xid_to_job[xid] = req
+
+    def pop_request(self, xid):
+        return self.xid_to_job.pop(xid, None)
+
+
 class JobMasterHandler(BaseApp):
-    _EVENTS = [EventJobManagerDelete, EventJobManagerReady]
+    _EVENTS = [EventJobManagerDelete, EventJobManagerReady, ReplyJobCreate]
 
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
-        self.name = 'job_master_handler'
+        self.name = APP_NAME
         self.job_managers = {}
+        self.create_request = {}
         self.conn_map = {}
         self.job_queue = hub.Queue()
 
     def start(self):
         task = super().start()
-        # app_hub.spawn(self.job_consumer)
         return task
-
-    """
-    def job_consumer(self):
-        while True:
-            try:
-                job_get = self.job_queue.get(block=False)
-                LOG.info(f'Get item from Queue. Item {job_get}')
-            except Empty:
-                continue
-
-            job = job_get['job']
-            address = job_get['address']
-            self.install_job(job, address)
-    """
 
     @observe_event(mcp_event.EventMCPStateChange, MC_STABLE)
     def agent_join(self, ev):
         conn = ev.connection
-        LOG.info(f'Create Job Manager {conn.address[0]}')
+        address = conn.address[0]
+        conn_id = conn.id
 
-        if conn.id in self.job_managers and isinstance(self.job_managers[conn.id], JobManager):
-            del self.job_managers[conn.id]
+        LOG.info(f'Create Job Manager {address}')
 
-        self.job_managers[conn.id] = JobManager(
+        self.job_managers[conn_id] = JobManager(
             ev.connection)
+        self.create_request[conn_id] = CreateRequestManager(address)
 
-        self.conn_map = {conn.address[0]: conn.id}
+        self.conn_map = {address: conn_id}
 
         self.send_event_to_observers(
-            EventJobManagerReady(self, conn.address[0]), MC_STABLE)
+            EventJobManagerReady(self, address), MC_STABLE)
 
     @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
     def agent_leave(self, ev):
         conn = ev.connection
-        LOG.info(f'Delete Job Manager {conn.address[0]}.')
+        conn_id = conn.id
+        address = conn.address[0]
+        LOG.info(f'Delete Job Manager {address}.')
+
+        if job_manager := self.job_managers.pop(conn_id, None):
+            del job_manager
+        if create_request := self.create_request.pop(conn_id, None):
+            for _, req in create_request.xid_to_job:
+                self.send_event(
+                    req.src, ReplyJobCreate.create_by_request(req, JOB_CREATE_FAIL))
+
+            del create_request
 
         self.send_event_to_observers(
-            EventJobManagerDelete(conn.address[0]), MC_STABLE)
+            EventJobManagerDelete(address), MC_STABLE)
 
     def agent_machine_leave(self, ev):
         del self.job_managers[ev.connection.id]
@@ -91,12 +133,17 @@ class JobMasterHandler(BaseApp):
         LOG.info(f'Get Job create reply')
 
         msg = ev.msg
-        conn = ev.msg.connection
-        job_id = ev.msg.job_id
-        self.job_managers[conn.id].job_id_async(msg.xid, msg.job_id)
+        xid = msg.xid
+        conn: MachineConnection = ev.msg.connection
+        self.job_managers[conn.id].job_id_async(xid, msg.job_id)
 
-        msg = conn.mcproto_parser.MCPJobACK(conn, job_id)
-        conn.send_msg(msg)
+        # msg = conn.mcproto_parser.MCPJobACK(conn, job_id)
+        # conn.send_msg(msg)
+        if (req := self.create_request[conn.id].pop_request(xid)) is None:
+            return
+
+        rep = ReplyJobCreate.create_by_request(req, JOB_CREATE_SUCCESS)
+        self.send_event(req.src, rep)
 
     @observe_event(mcp_event.EventMCPJobDeleteReply, MC_STABLE)
     def job_deleted_handler(self, ev):
@@ -171,13 +218,19 @@ class JobMasterHandler(BaseApp):
 
         return False
 
-    def install_job(self, job: Job, address):
+    @observe_event(RequestJobCreate, MC_STABLE)
+    def create_job(self, req):
+        job: Job = req.job
+        address = req.address
         try:
             conn_id = self.conn_map[address]
         except KeyError:
             LOG.info(f'Client {address} not exist.')
             job.change_state(JOB_FAIELD)
-            return False
+            rep = ReplyJobCreate.create_by_request(req, JOB_CREATE_FAIL)
+            self.send_event(req.src, rep)
+
+            return
 
         if job.remote_mode is True:
             job_manager: JobManager = self.job_managers[conn_id]
@@ -189,4 +242,4 @@ class JobMasterHandler(BaseApp):
             job_manager.add_request(xid=msg.xid, job_obj=job)
             job_manager.connection.send_msg(msg)
 
-            return msg.xid
+            self.create_request[conn_id].add_request(msg.xid, req)

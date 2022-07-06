@@ -8,7 +8,7 @@ from async_app_fw.lib.hub import app_hub
 from custom_app.job_app.job_util.job_class import JOB_CREATE, JOB_CREATED, JOB_DELETE, JOB_FAIELD, REMOTE_MATER, STATE_MAPPING, Job
 from custom_app.job_app.job_util import JobRequest, JobTshark
 from custom_app.job_app.job_util.api_action_module import SwitchAPIAction
-from custom_app.job_app.job_master_handler import EventJobManagerDelete, JobMasterHandler, EventJobManagerReady
+from custom_app.job_app.job_master_handler import JOB_CREATE_FAIL, EventJobManagerDelete, EventJobManagerReady, ReplyJobCreate, RequestJobCreate
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.mcp_state import MC_STABLE
@@ -71,33 +71,7 @@ class TopologyDiscovery(BaseApp):
 
     def start(self):
         task = super().start()
-        self.job_request_checker_task = app_hub.spawn(self.job_checker)
         return task
-
-    async def job_checker(self):
-        try:
-            while True:
-                for address, sw_info in self.agent_sw_ip_mapping.items():
-                    sw_name = sw_info['device_name']
-                    if (job_request := sw_info['job_request']) is not None:
-                        if job_request.state == JOB_CREATE:
-                            # LOG.info(
-                            # f'Client <{address}> Ready to run. Target SW: {sw_name}')
-                            if sw_info['running'] == False:
-                                job_request.run()
-                                sw_info['running'] = True
-
-                    if (job_tshark := sw_info['job_tshark']) is not None:
-                        if job_tshark.state == JOB_CREATE:
-                            # LOG.info(
-                            # f'Client <{address}> Ready to run. Target SW: {sw_name}')
-                            if sw_info['tshark_running'] == False:
-                                job_tshark.run()
-                                sw_info['tshark_running'] = True
-
-                await asyncio.sleep(5)
-        except Exception as e:
-            print(traceback.format_exc())
 
     def lldp_tshark_hadler(self, tshark_info, packet: Packet):
         try:
@@ -125,10 +99,22 @@ class TopologyDiscovery(BaseApp):
                 f'{request_info["host_name"]}:{port_num} connect to {neighbor["SystemName"]:{neighbor["PortIdSubtype"]}}')
         print('**********************')
 
+    @observe_event(ReplyJobCreate, MC_STABLE)
+    def job_create_handler(self, rep):
+        if rep.create_result == JOB_CREATE_FAIL:
+            # do something if job create failed.
+            pass
+
+        job = rep.job
+        address = rep.address
+
+        LOG.info(
+            f'Client {address} Job {rep.stamp} create success. Start running...')
+        job.run()
+
     @observe_event(EventJobManagerReady, MC_STABLE)
     def job_manager_ready(self, ev):
         address = ev.address
-        job_app: JobMasterHandler = ev.job_app
         url = 'lldp/neighbors/status'
 
         lldp_request_opt = dict({
@@ -163,14 +149,16 @@ class TopologyDiscovery(BaseApp):
                 lldp_request_opt, remote_mode=True, remote_role=REMOTE_MATER)
             job.set_output_method(self.lldp_request_handler)
             self.agent_sw_ip_mapping[address]['job_request'] = job
-            job_app.install_job(job, address)
+            req = RequestJobCreate(job, address, stamp='request')
+            self.send_event(req.dst, req, MC_STABLE)
 
             # create tshark job
             job_t = JobTshark(tshark_options=lldp_tshark_opt,
                               remote_mode=True, remote_role=REMOTE_MATER)
             job_t.set_output_method(self.lldp_tshark_hadler)
             self.agent_sw_ip_mapping[address]['job_tshark'] = job_t
-            job_app.install_job(job_t, address)
+            req = RequestJobCreate(job_t, address, stamp='tshark')
+            self.send_event(req.dst, req, MC_STABLE)
 
     @observe_event(EventJobManagerDelete, MC_STABLE)
     def job_manager_delete(self, ev):
