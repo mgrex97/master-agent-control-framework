@@ -169,10 +169,10 @@ class BaseApp(object):
 
         return observers
 
-    def send_request(self, req):
+    def send_request(self, req) -> asyncio.Task:
         """
         Make a synchronous request.
-        Set req.sync to True, send it to a Ryu application specified by
+        Set req.sync to True, send it to a application specified by
         req.dst, and block until receiving a reply.
         Returns the received reply.
         The argument should be an instance of EventRequestBase.
@@ -183,7 +183,7 @@ class BaseApp(object):
         req.reply_q = hub.Queue()
         self.send_event(req.dst, req)
         # going to sleep for the reply
-        return req.reply_q.get()
+        return app_hub.spawn(req.reply_q.get)
 
     async def _event_loop(self):
         try:
