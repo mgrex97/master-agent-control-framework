@@ -34,23 +34,25 @@ def __re_check_token(text):
 LOG = logging.getLogger('API Action')
 
 
-# Atleast retry one
-def check_token(retry_login=1):
+class APINotLoginYet(Exception):
+    pass
+
+
+def check_token():
     def _decorator(func):
         async def _check_token(self, *args, **kwargs):
             if self.request_session is None:
-                await self.login_api()
+                raise APINotLoginYet()
 
-            for retry in range(retry_login):
-                res = await func(self, *args, **kwargs)
+            res = await func(self, *args, **kwargs)
 
-                # token exist
-                if __re_check_token(res.text):
-                    return res
+            # token exist
+            if __re_check_token(res.text):
+                return res
 
-                LOG.warning(
-                    f'API action <{self.host_ip}> not login yet, try login: {retry + 1}')
-                await self.login_api()
+            LOG.warning(
+                f'API action <{self.host_ip}> not login yet.')
+            raise APINotLoginYet()
 
         _check_token._method_name = func.__name__
         return _check_token
@@ -173,6 +175,7 @@ class JobRequest(Job):
         self.times = request_info.get('running_times', 5)
         self.retry_mode = request_info.get('retry_mode', False)
         self.output_method = None
+        self.login_state = False
 
         if self.retry_mode is True:
             self.retry_data = request_info['retry_data']
@@ -208,7 +211,11 @@ class JobRequest(Job):
             'type': type, 'url': url, 'data': data,
             'host_ip': self.host_ip, 'host_name': self.host_name
         }
-        res: requests.Response = await self.api_action.method_set[type](url, data)
+
+        try:
+            res: requests.Response = await self.api_action.method_set[type](url, data)
+        except APINotLoginYet as e:
+            self.login_state = False
 
         # pop out request task from task_dict
         self.task_dict.pop(request_id)
@@ -228,6 +235,11 @@ class JobRequest(Job):
                 url = self.retry_data['url']
                 data = self.retry_data.get('data', None)
             while time() < time_tmp:
+                if self.login_state is False:
+                    # still need to implement login result check
+                    await self.api_action.login_api()
+                    self.login_state = True
+
                 if self.retry_mode is False:
                     (type, url, data) = await self.request_queue.get()
 
@@ -259,8 +271,8 @@ class JobRequest(Job):
         else:
             print(result)
 
-    @ActionHandler(JOB_STOP, JOB_STOPING, cancel_current_task=True)
-    def stop(self):
+    @ActionHandler(JOB_STOP, JOB_STOPED, cancel_current_task=True)
+    async def stop(self):
         # make sure all request tasks are going to cancel.
         LOG.info(' Stop request task.')
         if self.task_dict is not None:
@@ -268,6 +280,15 @@ class JobRequest(Job):
             for _, task in self.task_dict:
                 task.cancel()
 
+            # wait all tasks cleared.
+            for _, task in self.task_dict:
+                await task
+
+            # reset task_dict
+            del self.task_dict
+            self.task_dict = None
+
+    """
     @HandleStateChange((JOB_STOP, JOB_STOPING), JOB_STOPED)
     async def wait_request_task_stop(self):
         # wait all task is clear.
@@ -278,6 +299,7 @@ class JobRequest(Job):
         # reset task_dict
         del self.task_dict
         self.task_dict = None
+    """
 
     @ActionHandler(JOB_DELETE, JOB_DELETED, require_before=True, cancel_current_task=True)
     async def delete(self, before=None):
@@ -285,12 +307,12 @@ class JobRequest(Job):
         if before != JOB_STOPED:
             # append stop aciton into handler_exe_queue
             self.stop(cancel_current_task=False)
-            self.wait_request_task_stop()
+            # self.wait_request_task_stop()
             # append delete aciton into handler_exe_queue
             self.delete(cancel_current_task=False)
         else:
             # wait output queue and exe handler queue stop.
-            await super().delete()
+            super().delete()
 
     def __del__(self):
         self.delete()
