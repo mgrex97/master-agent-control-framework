@@ -118,7 +118,7 @@ class JobMasterHandler(BaseApp):
         if job_manager := self.job_managers.pop(conn_id, None):
             del job_manager
         if create_request := self.create_request.pop(conn_id, None):
-            for _, req in create_request.xid_to_job:
+            for _, req in create_request.xid_to_job.items():
                 self.send_event(
                     req.src, ReplyJobCreate.create_by_request(req, JOB_CREATE_FAIL))
 
