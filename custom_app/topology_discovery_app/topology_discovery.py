@@ -6,7 +6,7 @@ from async_app_fw.event.event import EventBase, EventReplyBase, EventRequestBase
 
 from async_app_fw.lib import hub
 from async_app_fw.lib.hub import app_hub
-from custom_app.job_app.job_util.job_class import JOB_CREATE, JOB_CREATED, JOB_DELETE, JOB_FAIELD, REMOTE_MATER, STATE_MAPPING, Job
+from custom_app.job_app.job_util.job_class import REMOTE_MATER
 from custom_app.job_app.job_util import JobRequest, JobTshark
 from custom_app.job_app.job_util.api_action_module import SwitchAPIAction
 from custom_app.job_app.job_master_handler import JOB_CREATE_FAIL, EventJobManagerDelete, EventJobManagerReady, ReplyJobCreate, RequestJobCreate
@@ -52,38 +52,42 @@ class TopologyDiscovery(BaseApp):
         self.job_managers = {}
         self.conn_map = {}
         self.job_queue = hub.Queue()
-        self.agent_sw_ip_mapping = {
-            '169.254.0.1': {
+        self.switches = {}
+        self.sw_ip_to_info = {
+            '10.88.0.11': {
                 'device_name': 'QSW-M408-sw1',
+                'mac': '24:5e:be:6b:31:f7',
+            }, '10.88.0.12': {
+                'device_name': 'QSW-M408-sw2',
+                'mac': '24:5e:be:6b:31:9a',
+            }, '10.88.0.13': {
+                'device_name': 'QSW-M1208-sw3',
+                'mac': '24:5e:be:6a:e9:56',
+            }, '10.88.0.14': {
+                'device_name': 'QSW-M408-sw4',
+                'mac': '24:5e:be:6b:31:b8',
+            }
+        }
+        self.agent_task_mapping = {
+            '169.254.0.1': {
                 'sw_ip': '10.88.0.11',
                 'job_request': None,
-                'running': False,
                 'job_tshark': None,
-                'tshark_running': False,
             },
             '169.254.0.2': {
-                'device_name': 'QSW-M408-sw2',
                 'sw_ip': '10.88.0.12',
                 'job_request': None,
-                'running': False,
                 'job_tshark': None,
-                'tshark_running': False,
             },
             '169.254.0.3': {
-                'device_name': 'QSW-M1208-sw3',
                 'sw_ip': '10.88.0.13',
                 'job_request': None,
-                'running': False,
                 'job_tshark': None,
-                'tshark_running': False
             },
             '169.254.0.4': {
-                'device_name': 'QSW-M408-sw4',
                 'sw_ip': '10.88.0.14',
                 'job_request': None,
-                'running': False,
                 'job_tshark': None,
-                'tshark_running': False
             }
         }
         self.mac_to_sw_name = {
@@ -159,36 +163,37 @@ class TopologyDiscovery(BaseApp):
             'use_json': True
         })
 
-        if address in self.agent_sw_ip_mapping:
-            sw_info = self.agent_sw_ip_mapping[address]
-            self.api_action.host_ip = sw_info['sw_ip']
+        if address in self.agent_task_mapping:
+            target_sw_ip = self.agent_task_mapping[address]['sw_ip']
+            sw_info = self.sw_ip_to_info[target_sw_ip]
+            self.api_action.host_ip = target_sw_ip
             self.api_action.hostname = sw_info['device_name']
             # prepare request_info
-            lldp_request_opt['host_ip'] = sw_info['sw_ip']
+            lldp_request_opt['host_ip'] = target_sw_ip
             lldp_request_opt['login_info'] = self.api_action.get_login_info()
             lldp_request_opt['retry_data']['url'] = self.api_action.get_api_url_with_path(
                 url)
 
             # create request job.
-            job = JobRequest(
+            job_r = JobRequest(
                 lldp_request_opt, remote_mode=True, remote_role=REMOTE_MATER)
-            job.set_output_method(self.lldp_request_handler)
-            self.agent_sw_ip_mapping[address]['job_request'] = job
-            req = RequestJobCreate(job, address, stamp='request')
+            job_r.set_output_method(self.lldp_request_handler)
+            self.agent_task_mapping[address]['job_request'] = job_r
+            req = RequestJobCreate(job_r, address, stamp='request')
             self.send_event(req.dst, req, MC_STABLE)
 
             # create tshark job
             job_t = JobTshark(tshark_options=lldp_tshark_opt,
                               remote_mode=True, remote_role=REMOTE_MATER)
             job_t.set_output_method(self.lldp_tshark_hadler)
-            self.agent_sw_ip_mapping[address]['job_tshark'] = job_t
+            self.agent_task_mapping[address]['job_tshark'] = job_t
             req = RequestJobCreate(job_t, address, stamp='tshark')
             self.send_event(req.dst, req, MC_STABLE)
 
     @observe_event(EventJobManagerDelete, MC_STABLE)
     def job_manager_delete(self, ev):
         address = ev.address
-
-        if address in self.agent_sw_ip_mapping:
-            self.agent_sw_ip_mapping[address]['job_request'] = None
-            self.agent_sw_ip_mapping[address]['running'] = False
+        if address in self.agent_task_mapping:
+            agent_task = self.agent_task_mapping[address]
+            agent_task['job_request'] = None
+            agent_task['job_tshark'] = None
