@@ -4,7 +4,7 @@ from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnect
 from async_app_fw.event.event import EventBase, EventReplyBase, EventRequestBase
 from async_app_fw.lib import hub
 from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
-from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, Job
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, Job, REMOTE_MATER
 from custom_app.job_app.job_util.job_subprocess import JobCommand
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.event.mcp_event import mcp_event
@@ -19,9 +19,14 @@ LOG = logging.getLogger('custom_app.job_app.jog_master_handler')
 
 APP_NAME = 'job_master_handler'
 
+JOB_CREATE_SUCCESS = 0
+JOB_CREATE_FAIL = 1
+
+JOB_CREATE_LOCAL = 'local'
+
 
 class EventJobManagerReady(EventBase):
-    def __init__(self, job_app, address):
+    def __init__(self, job_app, address=JOB_CREATE_LOCAL):
         super(EventJobManagerReady, self).__init__()
         self.address = address
         self.job_app = job_app
@@ -31,10 +36,6 @@ class EventJobManagerDelete(EventBase):
     def __init__(self, address):
         super(EventJobManagerDelete, self).__init__()
         self.address = address
-
-
-JOB_CREATE_SUCCESS = 0
-JOB_CREATE_FAIL = 1
 
 
 class RequestJobCreate(EventRequestBase):
@@ -81,6 +82,7 @@ class JobMasterHandler(BaseApp):
         super().__init__(*_args, **_kwargs)
         self.name = APP_NAME
         self.job_managers = {}
+        self.job_managers[JOB_CREATE_LOCAL] = JobManager()
         self.create_request = {}
         self.conn_map = {}
         self.job_queue = hub.Queue()
@@ -240,7 +242,12 @@ class JobMasterHandler(BaseApp):
 
             return
 
-        if job.remote_mode is True:
+        if address == JOB_CREATE_LOCAL:
+            self.job_managers[JOB_CREATE_LOCAL].add_job_with_new_id(job)
+        else:
+            # check ip
+            job.remote_mode = True
+            job.remote_role = REMOTE_MATER
             job_manager: JobManager = self.job_managers[conn_id]
             msg = job_manager.connection.mcproto_parser.MCPJobCreateRequest(
                 job_manager.connection, timeout=job.timeout, job_info=job.job_info_serialize())

@@ -63,6 +63,10 @@ class JobManager:
         self.__job_serial_id = self.__job_serial_id + 1
         return job_id
 
+    def add_job_with_new_id(self, job_obj):
+        job_obj.id = self.get_new_job_id()
+        self.add_job(job_obj)
+
     def delete_all_job(self):
         for job_id in list(self.jobs.keys()):
             self.del_job(job_id)
