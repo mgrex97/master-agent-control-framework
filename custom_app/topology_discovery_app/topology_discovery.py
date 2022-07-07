@@ -19,11 +19,13 @@ _REQUIRED_APP = [
 
 LOG = logging.getLogger('custom_app.topology_discovery')
 
+APP_NAME = 'topology_discovery'
+
 
 class TopologyDiscovery(BaseApp):
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
-        self.name = 'topology_discovery'
+        self.name = APP_NAME
         self.job_managers = {}
         self.conn_map = {}
         self.job_queue = hub.Queue()
