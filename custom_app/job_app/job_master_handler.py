@@ -135,11 +135,19 @@ class JobMasterHandler(BaseApp):
         msg = ev.msg
         xid = msg.xid
         conn: MachineConnection = ev.msg.connection
+        id = conn.id
         self.job_managers[conn.id].job_id_async(xid, msg.job_id)
 
         # msg = conn.mcproto_parser.MCPJobACK(conn, job_id)
         # conn.send_msg(msg)
+        if conn.id not in self.create_request:
+            LOG.warning(
+                f'Connection ID {id} not exist in dict create_request.')
+            return
+
         if (req := self.create_request[conn.id].pop_request(xid)) is None:
+            LOG.warning(
+                f'xid {xid} not exist in CreateRequestManager.')
             return
 
         rep = ReplyJobCreate.create_by_request(req, JOB_CREATE_SUCCESS)
