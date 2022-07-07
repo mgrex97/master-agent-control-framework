@@ -2,6 +2,7 @@ import asyncio
 import logging
 import traceback
 from pyshark.packet.packet import Packet
+from async_app_fw.event.event import EventBase, EventReplyBase, EventRequestBase
 
 from async_app_fw.lib import hub
 from async_app_fw.lib.hub import app_hub
@@ -20,6 +21,28 @@ _REQUIRED_APP = [
 LOG = logging.getLogger('custom_app.topology_discovery')
 
 APP_NAME = 'topology_discovery'
+
+
+class RequestTopologyInfo(EventRequestBase):
+    def __init__(self):
+        super().__init__()
+        self.dst = APP_NAME
+
+
+class ReplyTopologyInfo(EventReplyBase):
+    def __init__(self, dst, topology_info):
+        super().__init__(dst)
+        self.topology_info = topology_info
+
+    @classmethod
+    def create_by_request(cls, req, topology_info):
+        return cls(req.dst, topology_info)
+
+
+class EventTopologyChange(EventBase):
+    # not implement yet.
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class TopologyDiscovery(BaseApp):
