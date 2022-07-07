@@ -125,7 +125,7 @@ class TopologyDiscovery(BaseApp):
             port_num = tmp['key']
             neighbor = tmp['val']
             print(
-                f'{request_info["host_name"]}:{port_num} connect to {neighbor["SystemName"]:{neighbor["PortIdSubtype"]}}')
+                f'{request_info["host_name"]}:{port_num} connect to {neighbor["SystemName"]}:{neighbor["PortIdSubtype"]}')
         print('**********************')
 
     @observe_event(ReplyJobCreate, MC_STABLE)
