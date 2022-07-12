@@ -22,6 +22,51 @@ def check_token(func):
     return wrap
 
 
+class SwitchApiInfoProducer():
+    def __init__(self, version, host_ip, hostname, username=None, password=None) -> None:
+        self.version = version
+        self.host_ip = host_ip
+        self.hostname = hostname
+        self.username = username
+        self.password = password
+        self.head_url = SwitchApiInfoProducer.get_url(host_ip, version)
+        self.login_path = 'users/login'
+
+    @staticmethod
+    def get_url(host_ip, api_version, path='') -> str:
+        return f"https://{host_ip}/api/{api_version}/{path}"
+
+    def get_instance_url(self, path=''):
+        return self.head_url + path
+
+    @staticmethod
+    def encrpt_password(pw):
+        encrpt_pw = str(base64.b64encode(pw.encode()), 'utf-8')
+        return encrpt_pw
+
+    def get_login_info(self, login_path=None):
+        login_path = self.login_path if login_path is None else login_path
+
+        data = {
+            'username': self.username,
+            'password': SwitchApiInfoProducer.encrpt_password(self.password)
+        }
+
+        if self.version == 'v3':
+            data['rememberme'] = True
+
+        login_info = {
+            'host_ip': self.host_ip,
+            'method': 'post',
+            'path': self.get_instance_url(self.login_path),
+            'data': data,
+            'host_name': self.hostname
+        }
+        login_info['auth_path'] = "result.AccessToken" if self.version == 'v3' else 'result'
+
+        return login_info
+
+
 class SwitchAPIAction:
     def __init__(self):
         try:
