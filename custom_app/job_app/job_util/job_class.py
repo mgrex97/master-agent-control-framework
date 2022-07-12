@@ -7,7 +7,7 @@ from typing import Tuple
 
 from async_app_fw.lib import hub
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
-from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobOutput, MCPJobStateChange
+from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobFeatureExe, MCPJobOutput, MCPJobStateChange
 from async_app_fw.utils import _listify
 
 # job state, max size 16 (0~15)
@@ -112,12 +112,14 @@ def collect_handler(cls):
     _action_set = {}
     _observe_set = {}
     _observe_name_set = {}
+    _feature_set = {}
 
     def _is_handler_or_action(handler):
         if inspect.isfunction(handler) and \
                 (hasattr(handler, '_state_change') or
                  hasattr(handler, '_action') or
-                 hasattr(handler, '_observe')):
+                 hasattr(handler, '_observe') or
+                 hasattr(handler, '_feature_opt')):
             return True
         else:
             return False
@@ -156,11 +158,15 @@ def collect_handler(cls):
                     _observe_set.setdefault(state, observe_list)
 
                 observe_list.append(handler)
+        elif (feature_opt := getattr(handler, '_feature_opt', None)):
+            name = feature_opt.get('name', None)
+            _feature_set[name] = handler
 
     cls._handler_set = _handler_set
     cls._action_set = _action_set
     cls._observe_set = _observe_set
     cls._observe_name_set = _observe_name_set
+    cls._feature_set = _feature_set
 
     return cls
 
@@ -379,6 +385,32 @@ class ActionHandler(object):
         return _action_handler
 
 
+class NormalFeature(object):
+    def __init__(self, state=None) -> None:
+        self.state = _listify(state)
+
+    def __call__(_self, fun):
+        def _run_feature(self: Job, *args, **kwargs):
+            # state check
+            if _self.state is not None:
+                if self.state not in _self.state:
+                    return
+
+            if self.remote_mode is True and self.remote_role == REMOTE_MATER:
+                # send to remote
+                self._remote_normal_feature_exe(fun.__name__, *args, **kwargs)
+            else:
+                fun(self, *args, **kwargs)
+
+        _run_feature._feature_opt = {
+            'name': fun.__name__,
+            'opt': _self
+        }
+        _run_feature
+
+        return _run_feature
+
+
 class TaskQueueStopRunning:
     pass
 
@@ -482,6 +514,18 @@ class Job:
         self._output_queue.put_nowait(
             (output_handler, args, kwargs))
 
+    def exe_feature(self, feature_opt):
+        name = feature_opt['name']
+
+        if (feature_fun := self._feature_set.get(name, None)) is None:
+            self.LOG.error(f'Feature name <{name}> is not exist.')
+            return
+
+        args = feature_opt['args']
+        kwargs = feature_opt['kwargs']
+
+        feature_fun(self, *args, **kwargs)
+
     @classmethod
     def create_job_by_job_info(cls, connection, job_info, job_id, remote_role=None):
         assert job_id > 0
@@ -558,6 +602,13 @@ class Job:
         kwargs['observer_name'] = observer_name
         output = {'args': args, 'kwargs': kwargs}
         msg = MCPJobOutput(self.connection, self.id, state, output)
+
+        self.connection.send_msg(msg)
+
+    def _remote_normal_feature_exe(self, feature_name, *args, **kwargs):
+        feature_arg = {'args': args, 'kwargs': kwargs, 'name': feature_name}
+        msg = MCPJobFeatureExe(self.connection, self.id,
+                               self.state, feature_arg)
 
         self.connection.send_msg(msg)
 
