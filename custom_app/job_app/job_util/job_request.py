@@ -9,7 +9,7 @@ from typing import Awaitable
 import requests
 import urllib3
 from async_app_fw.lib.hub import app_hub
-from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, REMOTE_MATER
+from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, REMOTE_MATER, NormalFeature
 from custom_app.job_app.job_util.job_class import Job, collect_handler
 from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange, ActionHandler
 
@@ -176,6 +176,7 @@ class JobRequest(Job):
         self.retry_mode = request_info.get('retry_mode', False)
         self.output_method = None
         self.login_state = False
+        self.req_task_set = set()
 
         if self.retry_mode is True:
             self.retry_data = request_info['retry_data']
@@ -206,7 +207,7 @@ class JobRequest(Job):
     def run(self):
         pass
 
-    async def spawn_request_with_callback(self, request_id, type, url, data):
+    async def spawn_request_with_callback(self, type, url, data):
         request_info = {
             'type': type, 'url': url, 'data': data,
             'host_ip': self.host_ip, 'host_name': self.host_name
@@ -217,8 +218,9 @@ class JobRequest(Job):
         except APINotLoginYet as e:
             self.login_state = False
 
-        # pop out request task from task_dict
-        self.task_dict.pop(request_id)
+        # pop out request task from req_task_set
+        task = asyncio.current_task()
+        self.req_task_set.remove(task)
         try:
             self.request_handler(request_info, res.json())
         except json.decoder.JSONDecodeError:
@@ -226,9 +228,11 @@ class JobRequest(Job):
 
     @HandleStateChange((JOB_RUN, JOB_RUNNING), JOB_STOP)
     async def request_consumer(self):
-        request_id = 0
-        self.task_dict = {}
         time_tmp = time() + self.times
+        api_action = self.api_action
+        request_queue = self.request_queue
+        retry_mode = self.retry_mode
+
         try:
             if self.retry_mode is True:
                 type = self.retry_data['type']
@@ -237,17 +241,18 @@ class JobRequest(Job):
             while time() < time_tmp:
                 if self.login_state is False:
                     # still need to implement login result check
-                    await self.api_action.login_api()
+                    await api_action.login_api()
                     self.login_state = True
 
-                if self.retry_mode is False:
-                    (type, url, data) = await self.request_queue.get()
+                if retry_mode is False:
+                    (type, url, data) = await request_queue.get()
 
-                self.task_dict[request_id] = app_hub.spawn(
-                    self.spawn_request_with_callback, request_id, type, url, data)
+                task = app_hub.spawn(
+                    self.spawn_request_with_callback, type, url, data)
 
-                request_id = request_id + 1
-                if self.remote_mode is True:
+                self.req_task_set.add(task)
+
+                if self.remote_mode is True and retry_mode is True:
                     await asyncio.sleep(self.retry_interval)
 
         except asyncio.CancelledError:
@@ -257,7 +262,8 @@ class JobRequest(Job):
         finally:
             pass
 
-    def push_request_data_to_queue(self, type, url, data):
+    @NormalFeature(JOB_RUNNING)
+    def push_request_data_to_queue(self, type, url, data=None):
         assert self.retry_mode is False
         # need to implement exception catch, if QueueFull raise.
         self.request_queue.put_nowait((type, url, data))
@@ -275,18 +281,17 @@ class JobRequest(Job):
     async def stop(self):
         # make sure all request tasks are going to cancel.
         LOG.info(' Stop request task.')
-        if self.task_dict is not None:
+        if self.req_task_set is not None:
             # cancel, delete request task.
-            for _, task in self.task_dict:
+            for task in self.req_task_set:
                 task.cancel()
 
             # wait all tasks cleared.
-            for _, task in self.task_dict:
+            for task in self.req_task_set:
                 await task
 
             # reset task_dict
-            del self.task_dict
-            self.task_dict = None
+            self.req_task_set.clear()
 
     """
     @HandleStateChange((JOB_STOP, JOB_STOPING), JOB_STOPED)
