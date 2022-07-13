@@ -9,6 +9,7 @@ from async_app_fw.lib import hub
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
 from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobFeatureExe, MCPJobOutput, MCPJobStateChange
 from async_app_fw.utils import _listify
+from custom_app.job_app.job_util.job_event import JobEventStateChange
 
 # job state, max size 16 (0~15)
 JOB_ANY_STATE = 0
@@ -432,6 +433,7 @@ class Job:
         self.state_inform_interval = state_inform_interval
         self._handler_exe_queue = asyncio.Queue()
         self._output_queue = asyncio.Queue()
+        self.state_change_handler = set()
         self.LOG = logging.getLogger(f'Job init')
 
         if remote_mode is True:
@@ -567,7 +569,15 @@ class Job:
         self.LOG.name = f'JOB {STATE_MAPPING[state]}'
         self.LOG.info(
             f'State Change: {STATE_MAPPING[self.state]}  -> {STATE_MAPPING[state]}')
+        pre = self.state
         self.state = state
+        self.call_state_change_handler(pre)
+
+    def call_state_change_handler(self, previous):
+        ev = JobEventStateChange(self, previous)
+
+        for handler in self.state_change_handler:
+            handler(ev)
 
     def send_remote_change_state(self, before, after, info=None):
         msg = MCPJobStateChange(self.connection, self.id,
@@ -583,7 +593,9 @@ class Job:
         if self.remote_role == REMOTE_MATER:
             self.LOG.info(
                 f'State Change From Remote: {STATE_MAPPING[self.state]}  -> {STATE_MAPPING[after]}')
+            pre = self.state
             self.state = after
+            self.call_state_change_handler(pre)
 
             if self.state == JOB_DELETED:
                 self.delete()
@@ -651,3 +663,6 @@ class Job:
         }
 
         return output
+
+    def register_state_change_handler(self, handler):
+        self.state_change_handler.add(handler)
