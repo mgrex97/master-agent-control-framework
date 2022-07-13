@@ -4,7 +4,7 @@ import itertools
 import logging
 import gc
 
-from async_app_fw.controller.handler import register_instance, get_dependent_services
+from async_app_fw.controller.handler import register_instance, get_dependent_services, HANDLER_FILTER, FILTER_TYPE as DEFAULT_FILTER_TYPE
 from async_app_fw.event import event
 from async_app_fw.event.event import EventReplyBase, EventRequestBase
 from async_app_fw.lib import hub
@@ -145,21 +145,9 @@ class BaseApp(object):
         """
         ev_cls = ev.__class__
         handlers = self.event_handlers.get(ev_cls, [])
-        if state is None:
-            return handlers
+        handler_filter = HANDLER_FILTER.get(ev_cls.FILTER_TYPE)
 
-        def test(h):
-            if not hasattr(h, 'callers') or ev_cls not in h.callers:
-                # dynamically registered handlers does not have
-                # h.callers element for the event.
-                return True
-            states = h.callers[ev_cls].ev_types
-            if not states:
-                # empty states means all states
-                return True
-            return state in states
-
-        return filter(test, handlers)
+        return filter(lambda hanlder: handler_filter(hanlder, ev, ev_cls, state), handlers)
 
     def get_observers(self, ev, state):
         observers = []
@@ -386,6 +374,8 @@ class AppManager(object):
                 if not hasattr(m, 'callers'):
                     continue
                 for ev_cls, c in m.callers.items():
+                    if ev_cls.FILTER_TYPE != DEFAULT_FILTER_TYPE:
+                        continue
                     if not c.ev_source:
                         continue
 

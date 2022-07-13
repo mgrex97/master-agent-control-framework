@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+from async_app_fw.controller.handler import FILTER_TYPE
 
 
 def _is_event_class(cls):
@@ -30,6 +31,8 @@ class EventBase(object):
 
     A Ryu application can define its own event type by creating a subclass.
     """
+
+    FILTER_TYPE = FILTER_TYPE
 
     def __init__(self):
         super(EventBase, self).__init__()

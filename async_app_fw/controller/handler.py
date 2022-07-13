@@ -23,6 +23,44 @@ LOG = logging.getLogger('async_app_fw.controller.handler')
 # just represent OF datapath state. datapath specific so should be moved.
 
 
+class DuplicateHandler(Exception):
+    pass
+
+
+HANDLER_FILTER = {}
+
+
+def register_handler_filter(filter_type):
+    def register(handler_filter):
+        if filter_type in HANDLER_FILTER:
+            raise DuplicateHandler(
+                f'Filter type {filter_type} is already existed. \n Current <{filter_type}:{HANDLER_FILTER[filter_type].__name__}>')
+
+        HANDLER_FILTER[filter_type] = handler_filter
+        return handler_filter
+    return register
+
+
+FILTER_TYPE = 1
+
+
+@register_handler_filter(FILTER_TYPE)
+def default_handler_filter(handler, ev, ev_cls, state):
+    if state is None:
+        return True
+
+    if not hasattr(handler, 'callers') or ev_cls not in handler.callers:
+        # dynamically registered handlers does not have
+        # h.callers element for the event.
+        return True
+
+    states = handler.callers[ev_cls].ev_types
+    if not states:
+        # empty states means all states
+        return True
+    return state in states
+
+
 class _Caller(object):
     """Describe how to handle an event class.
     """
