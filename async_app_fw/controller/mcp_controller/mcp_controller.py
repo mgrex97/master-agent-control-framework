@@ -195,11 +195,7 @@ class MachineConnection(object):
                             # send event to observers and self event handlers
                             self.mcp_brick.send_event_to_observers(
                                 ev, self.state)
-                            handlers = self.mcp_brick.get_handlers(
-                                ev, self.state)
-
-                            for handler in handlers:
-                                handler(ev)
+                            self.mcp_brick.send_event_to_self(ev, self.state)
 
                     buf = buf[msg_len:]
                     buf_len = len(buf)
