@@ -211,6 +211,9 @@ class BaseApp(object):
     async def _send_event(self, ev, state):
         await self.events.put((ev, state))
 
+    def send_event_to_self(self, ev, state=None):
+        self.send_event(self.name, ev, state)
+
     def send_event(self, name, ev, state=None):
         """
         Send the specified event to the RyuApp instance specified by name.
