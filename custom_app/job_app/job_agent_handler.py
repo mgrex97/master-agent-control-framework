@@ -6,7 +6,7 @@ from async_app_fw.event import event
 from async_app_fw.event.mcp_event import mcp_event
 from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
-from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
+from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobFeatureExe, MCPJobStateChange
 from custom_app.job_app.job_manager import JobManager
 
 _REQUIRED_APP = [
@@ -71,3 +71,9 @@ class JobAgentHandler(BaseApp):
     def job_delete_all_handler(self, ev):
         self.LOG.info(f"Delete All Jobs.")
         self.job_manager.delete_all_job()
+
+    @observe_event(mcp_event.EventMCPJobFeatureExe, MC_STABLE)
+    def job_feature_exe_handler(self, ev):
+        msg: MCPJobFeatureExe = ev.msg
+        job: Job = self.job_manager.get_job(msg.job_id)
+        job.exe_feature(msg.info)
