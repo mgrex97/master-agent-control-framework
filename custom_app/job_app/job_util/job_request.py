@@ -12,6 +12,7 @@ from async_app_fw.lib.hub import app_hub
 from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_DELETED, JOB_RUN, JOB_RUNNING, JOB_STOP, JOB_STOPED, JOB_STOPING, REMOTE_MATER, NormalFeature
 from custom_app.job_app.job_util.job_class import Job, collect_handler
 from custom_app.job_app.job_util.job_class import ObserveOutput, HandleStateChange, ActionHandler
+from custom_app.job_app.job_util.job_event import JobEventRequestOutput
 
 REQUEST_JOB = 2
 
@@ -271,9 +272,9 @@ class JobRequest(Job):
     @ObserveOutput(JOB_RUNNING)
     def request_handler(self, state, request_info, result):
         if self.output_method is not None:
-            method = self.output_method
             # send request_info and result to output_method
-            method(request_info, result)
+            self.output_method(JobEventRequestOutput(
+                self, request_info['url'], request_info, result))
         else:
             print(result)
 
