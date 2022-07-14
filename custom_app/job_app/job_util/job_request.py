@@ -171,9 +171,9 @@ class JobRequest(Job):
         self.request_info = request_info.copy()
         self.host_ip = request_info['host_ip']
         self.host_name = request_info['login_info']['host_name']
-        self.task_dict = None
         self.times = request_info.get('running_times', 5)
         self.retry_mode = request_info.get('retry_mode', False)
+        self.head_url = request_info.get('head_url', '')
         self.output_method = None
         self.login_state = False
         self.req_task_set = set()
@@ -214,7 +214,7 @@ class JobRequest(Job):
         }
 
         try:
-            res: requests.Response = await self.api_action.method_set[type](url, data)
+            res: requests.Response = await self.api_action.method_set[type](self.head_url + url, data)
         except APINotLoginYet as e:
             self.login_state = False
 
