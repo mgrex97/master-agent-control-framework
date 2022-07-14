@@ -154,6 +154,7 @@ class TopologyDiscovery(BaseApp):
             '24:5e:be:6b:31:b8': 'QSW-M408-sw4'
         }
         self.job_to_info = {}
+        self.job_manager_ready_set = set()
 
         # topology item
         self.switches = {}
@@ -265,6 +266,9 @@ class TopologyDiscovery(BaseApp):
         address = ev.address
 
         if address in self.agent_task_mapping:
+            if address not in self.job_manager_ready_set:
+                self.job_manager_ready_set.add(address)
+
             self.create_job_request_sw(address)
             self.create_job_tshark_lldp(address)
 
@@ -321,6 +325,7 @@ class TopologyDiscovery(BaseApp):
     def job_manager_delete(self, ev):
         address = ev.address
         if address in self.agent_task_mapping:
+            self.job_manager_ready_set.pop(address, None)
             agent_task = self.agent_task_mapping[address]
             agent_task['job_request'] = None
             agent_task['job_tshark'] = None
