@@ -63,6 +63,16 @@ class EventLinkAdd(EventBase):
         self.link = link
 
 
+class RequestGetTopology(EventRequestBase):
+    def __init__(self):
+        super().__init__()
+
+
+class ReplyGetTopology(EventRequestBase):
+    def __init__(self):
+        super().__init__()
+
+
 lldp_url = 'lldp/neighbors/status'
 ports_url = 'ports'
 
@@ -130,8 +140,7 @@ class TopologyDiscovery(BaseApp):
                 'job_request': None,
                 'job_tshark': None,
             },
-            # '169.254.0.2': {
-            '127.0.0.1': {
+            '169.254.0.2': {
                 'sw_ip': '10.88.0.12',
                 'job_request': None,
                 'job_tshark': None,
@@ -177,6 +186,7 @@ class TopologyDiscovery(BaseApp):
         info = self.job_to_info.get(job, None)
         if info is None:
             LOG.error('Job not in job_to_info')
+            return
 
         if ev.current == JOB_RUNNING:
             # get ports data
@@ -187,11 +197,15 @@ class TopologyDiscovery(BaseApp):
         request_info = ev.request_info
         res = ev.res
 
-        if request_info['url'] != ports_url:
-            LOG.error(f'URL not correct {request_info["url"]} != {ports_url}')
+        address = request_info['host_ip']
+
+        if res['error_code'] != 200:
+            LOG.error(f'Get Switch Port info from {address} falied.')
+            # send request again.
+            req_job = self.sw_ip_to_info.get('job')
+            req_job.push_request_data_to_queue('get', ports_url)
             return
 
-        address = request_info['host_ip']
         LOG.info(f'Get Switch Port info from {address}.')
 
         sw_info = self.sw_ip_to_info.get(address)
@@ -234,11 +248,17 @@ class TopologyDiscovery(BaseApp):
         request_info = ev.request_info
         res = ev.res
 
+        sw_address = request_info['host_ip']
+
         if res['error_code'] != 200:
             return
 
-        sw_address = request_info['host_ip']
-        for tmp in res['result']:
+        if (result := res.get('result', None)) is None:
+            LOG.warning(
+                f"Can't get lldp neighbors info from {sw_address}.\nPlease check lldp feature has already on.")
+            return
+
+        for tmp in result:
             port_num = int(tmp['key'])
             neighbor = tmp['val']
             src = Port(sw_address, port_num,
@@ -297,19 +317,17 @@ class TopologyDiscovery(BaseApp):
         config_job_observe(self.request_job_running_handler,
                            JobEventStateChange, job)
         config_observe_job_request_output(
-            self, JobEventRequestOutput, job)
+            self, job)
 
         sw_info['job'] = job
-        self.job_to_info = {
-            job: {
-                'type': 'request',
-                'sw_info': sw_info
-            }
+        self.job_to_info[job] = {
+            'type': 'request',
+            'sw_info': sw_info
         }
 
     def create_job_tshark_lldp(self, address):
         lldp_tshark_opt = dict({
-            'interface': 'en9',
+            'interface': 'en0',
             'bpf_filter': 'ether proto 0x88cc',
             'use_json': True
         })
@@ -325,8 +343,13 @@ class TopologyDiscovery(BaseApp):
     def job_manager_delete(self, ev):
         address = ev.address
         if address in self.agent_task_mapping:
-            self.job_manager_ready_set.pop(address, None)
+            self.job_manager_ready_set.remove(address)
             agent_task = self.agent_task_mapping[address]
+            if (task := self.sw_ip_to_info[agent_task['sw_ip']].get('lldp_task', None)) is not None:
+                if task.done() is False:
+                    task.cancel()
+                task = None
+
             agent_task['job_request'] = None
             agent_task['job_tshark'] = None
 
