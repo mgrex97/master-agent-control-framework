@@ -3,7 +3,7 @@ from async_app_fw.base.app_manager import BaseApp
 from custom_app.job_app.job_util.job_class import Job
 from custom_app.job_app.job_util.job_request import JobRequest
 from custom_app.job_app.job_util.job_event import JOB_REQUEST_FILTER_TYPE, JobEventBase
-from custom_app.job_app.job_util.job_handler import _JobCaller, job_handler_filter
+from custom_app.job_app.job_util.job_handler import _JobCaller
 from async_app_fw.utils import _listify
 
 
@@ -44,16 +44,12 @@ def observe_request_output(job_ev, url=None, state=None):
     return _observe_request_output
 
 
-def config_observe_job_request_output(service_brick, job_ev_cls, job: JobRequest):
+def config_observe_job_request_output(service_brick, job: JobRequest):
     if not isinstance(service_brick, BaseApp):
         raise TypeError(
             f'Input variable service_brick is not instance of BaseApp.')
 
-    if not issubclass(job_ev_cls, JobEventBase):
-        raise TypeError(
-            f'Input variable job_ev_cls is not instance of JobEventBase.')
-
-    if not isinstance(job, Job):
+    if not isinstance(job, JobRequest):
         raise TypeError(f'Input variable job is not instance of Job.')
 
     job.set_output_method(
