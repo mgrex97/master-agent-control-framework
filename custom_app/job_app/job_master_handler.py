@@ -103,7 +103,10 @@ class JobMasterHandler(BaseApp):
             ev.connection)
         self.create_request[conn_id] = CreateRequestManager(address)
 
-        self.conn_map = {address: conn_id}
+        if address in self.conn_map:
+            LOG.warning(f'There is duplicate address. {address}')
+
+        self.conn_map[address] = conn_id
 
         self.send_event_to_observers(
             EventJobManagerReady(self, address), MC_STABLE)
@@ -232,9 +235,8 @@ class JobMasterHandler(BaseApp):
     def create_job(self, req):
         job: Job = req.job
         address = req.address
-        try:
-            conn_id = self.conn_map[address]
-        except KeyError:
+
+        if (conn_id := self.conn_map.get(address, None)) is None:
             LOG.info(f'Client {address} not exist.')
             job.change_state(JOB_FAIELD)
             rep = ReplyJobCreate.create_by_request(req, JOB_CREATE_FAIL)
