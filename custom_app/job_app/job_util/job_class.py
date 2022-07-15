@@ -592,7 +592,7 @@ class Job:
         # send state change event to job_handler.
         if self.remote_role == REMOTE_MATER:
             self.LOG.info(
-                f'State Change From Remote: {STATE_MAPPING[self.state]}  -> {STATE_MAPPING[after]}')
+                f'State Change From Remote <{self.connection.address}>:\t {STATE_MAPPING[self.state]}  -> {STATE_MAPPING[after]}')
             pre = self.state
             self.state = after
             self.call_state_change_handler(pre)
