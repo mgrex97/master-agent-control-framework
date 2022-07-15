@@ -55,22 +55,13 @@ def observe_job_event(job_ev, state=None):
     return _observe_job_event
 
 
-def config_job_observe(handler, job_ev_cls, job: Job):
-    service_brick: BaseApp = handler.__self__
-
-    if not issubclass(job_ev_cls, JobEventBase):
+def config_job_observe(service_brick: BaseApp, job: Job):
+    if not isinstance(service_brick, BaseApp):
         raise TypeError(
-            f'Input variable job_ev_cls is not instance of JobEventBase.')
+            f'Input variable service_brick is not instance of BaseApp.')
 
     if not isinstance(job, Job):
         raise TypeError(f'Input variable job is not instance of Job.')
 
-    if (callers := getattr(handler, 'callers', None)) is None:
-        raise Exception("Job handler doesn't has callers.")
-
-    if (caller := callers.get(job_ev_cls, None)) is None:
-        raise Exception(f"Job ev {job_ev_cls} not in callers dict.")
-
     job.register_state_change_handler(
         lambda state_change_ev: service_brick.send_event_to_self(state_change_ev))
-    caller.add_job(job)

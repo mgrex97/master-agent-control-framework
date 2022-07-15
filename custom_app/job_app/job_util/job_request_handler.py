@@ -50,7 +50,7 @@ def config_observe_job_request_output(service_brick, job: JobRequest):
             f'Input variable service_brick is not instance of BaseApp.')
 
     if not isinstance(job, JobRequest):
-        raise TypeError(f'Input variable job is not instance of Job.')
+        raise TypeError(f'Input variable job is not instance of JobRequest.')
 
     job.set_output_method(
         lambda output_ev: service_brick.send_event_to_self(output_ev))

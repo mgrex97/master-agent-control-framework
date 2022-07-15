@@ -264,7 +264,7 @@ class TopologyDiscovery(BaseApp):
             src = Port(sw_address, port_num,
                        self.sw_ip_to_info[sw_address]['mac'])
             neighbor_address = neighbor['ManagementAddress']
-            dst = Port(neighbor_address, port_num,
+            dst = Port(neighbor_address, neighbor['PortId'],
                        self.sw_ip_to_info[neighbor_address]['mac'])
             self._link_update(src, dst)
 
@@ -314,8 +314,7 @@ class TopologyDiscovery(BaseApp):
         req = RequestJobCreate(job, address, stamp='request')
         self.send_event(req.dst, req, MC_STABLE)
 
-        config_job_observe(self.request_job_running_handler,
-                           JobEventStateChange, job)
+        config_job_observe(JobEventStateChange, job)
         config_observe_job_request_output(
             self, job)
 
