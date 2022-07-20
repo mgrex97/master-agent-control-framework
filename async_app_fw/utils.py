@@ -25,7 +25,7 @@ import six
 LOG = logging.getLogger('async_framwork.utils')
 
 
-def _listify(may_list):
+def _listify(may_list)->list:
     if may_list is None:
         may_list = []
     if not isinstance(may_list, list):
