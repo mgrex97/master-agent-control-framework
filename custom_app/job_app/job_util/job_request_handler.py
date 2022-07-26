@@ -15,10 +15,10 @@ def job_request_url_filter(handler, ev: JobEventBase, ev_cls, state):
     if (callers := getattr(handler, 'callers', None)) is None:
         raise Exception("Job handler doesn't has callers.")
 
-    caller: _JobCaller = callers[ev_cls]
+    caller: _JobRequestCaller = callers[ev_cls]
 
     if caller.url != None:
-        if caller.url != ev.url:
+        if ev.url in caller.url:
             return False
 
     if caller.state is not None:
@@ -31,7 +31,7 @@ def job_request_url_filter(handler, ev: JobEventBase, ev_cls, state):
 class _JobRequestCaller(_JobCaller):
     def __init__(self, url=None, state=None):
         super().__init__(state)
-        self.url = url
+        self.url = url if url is None else set(_listify(url))
 
 
 def observe_request_output(job_ev, url=None, state=None):
