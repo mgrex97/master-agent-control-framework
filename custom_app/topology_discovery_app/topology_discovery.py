@@ -309,12 +309,11 @@ class TopologyDiscovery(BaseApp):
         # create request job.
         job = JobRequest(
             request_opt, remote_mode=True, remote_role=REMOTE_MATER)
-        job.set_output_method(self.ports_request_handler)
         self.agent_task_mapping[address]['job_request'] = job
         req = RequestJobCreate(job, address, stamp='request')
         self.send_event(req.dst, req, MC_STABLE)
 
-        config_job_observe(JobEventStateChange, job)
+        config_job_observe(self, job)
         config_observe_job_request_output(
             self, job)
 
