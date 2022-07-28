@@ -4,6 +4,7 @@ import os
 import inspect
 import socket
 import threading
+import traceback
 from async_app_fw.lib import ip
 from signal import SIGINT
 from async_app_fw.utils import _listify
@@ -81,11 +82,18 @@ class TaskLoop(object):
         return self.hub.spawn(_wait_tasks)
 
 
+class EventLoopAlreadyRunning(Exception):
+    pass
+
+
 class Hub():
     LOG = logging.getLogger('async_hub')
     LOG.setLevel(logging.WARNING)
 
     def __init__(self):
+        # make sure every singal Hub have different event loop instance.
+        self.loop = asyncio.new_event_loop()
+        self.update_thread()
         self.setup_eventloop()
         self.loop.add_signal_handler(
             SIGINT, Hub.sigtstp_handler, SIGINT, self.loop)
@@ -103,19 +111,10 @@ class Hub():
 
         cls.LOG.info(f'Got signal: {sig!s}, shutting down.')
 
+    def update_thread(self):
+        self.thread = threading.current_thread()
+
     def setup_eventloop(self):
-        if os.name == "nt":
-            self.eventloop = asyncio.ProactorEventLoop()
-        else:
-            try:
-                self.loop = asyncio.get_event_loop()
-            except RuntimeError:
-                if threading.current_thread() != threading.main_thread():
-                    # Ran not in main thread, make a new eventloop
-                    self.loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(self.loop)
-                else:
-                    raise
         if os.name == "posix" and isinstance(threading.current_thread(), threading._MainThread):
             asyncio.get_child_watcher().attach_loop(self.loop)
 
@@ -142,14 +141,22 @@ class Hub():
             finally:
                 self.LOG.info(f'Spawn end: {name}')
 
-        task = self.loop.create_task(_spawn(func, *args, **kwargs))
-        task.set_name(f'Task Spawn: <{func.__name__}>')
-        return task
+        coro = _spawn(func, *args, **kwargs)
+
+        if threading.current_thread() == self.thread:
+            task = self.loop.create_task(coro)
+            task.set_name(f'Task Spawn: <{func.__name__}>')
+            return task
+        else:
+            future = asyncio.run_coroutine_threadsafe(coro, self.loop)
+            return future
 
     def kill(self, task: asyncio.Task):
         task.cancel()
 
     def joinall(self, tasks):
+        tasks = _listify(tasks)
+
         async def _joinall(tasks):
             self.LOG.info('Await Joinall')
             while True:
@@ -160,6 +167,23 @@ class Hub():
                 except asyncio.CancelledError:
                     self.LOG.info('Joinall get cancel error. Keep running...')
 
+        try:
+            if (loop := asyncio.get_running_loop()):
+                pass
+
+            if loop != self.loop:
+                raise EventLoopAlreadyRunning(
+                    'There has different event loop is running.')
+            else:
+                raise EventLoopAlreadyRunning(
+                    'The event loop is running.')
+        except RuntimeError as e:
+            # get_running_loop is going to raise RuntimeError when there is no running loop.
+            # make sure there is not loop running.
+            pass
+
+        self.update_thread()
+        asyncio.set_event_loop(self.loop)
         self.loop.run_until_complete(_joinall(tasks))
 
 
