@@ -6,7 +6,7 @@ import gc
 
 from async_app_fw.controller.handler import register_instance, get_dependent_services, HANDLER_FILTER, FILTER_TYPE as DEFAULT_FILTER_TYPE
 from async_app_fw.event import event
-from async_app_fw.event.event import EventReplyBase, EventRequestBase
+from async_app_fw.event.event import EventBase, EventReplyBase, EventRequestBase
 from async_app_fw.lib import hub
 from async_app_fw.lib.hub import TaskLoop, app_hub
 from async_app_fw import utils
@@ -41,7 +41,7 @@ def unregister_app(app):
     SERVICE_BRICKS.pop(app.name)
 
 
-class EventLoopStop():
+class EventLoopStop(EventBase):
     pass
 
 
@@ -86,7 +86,7 @@ class BaseApp(object):
     def stop(self):
         async def _stop():
             self.is_active = False
-            await app_hub.spawn(self._send_event, self.event_loop_stop, None)
+            await self._send_event(self.event_loop_stop, None)
 
             if isinstance(self._event_loop_task, asyncio.Task):
                 app_hub.kill(self._event_loop_task)
