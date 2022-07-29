@@ -424,6 +424,8 @@ class AppManager(object):
         register_app(app)
         assert app.name not in self.applications
         self.applications[app.name] = app
+
+        LOG.info('instantiating app end.')
         return app
 
     def instantiate(self, cls, *args, **kwargs):
