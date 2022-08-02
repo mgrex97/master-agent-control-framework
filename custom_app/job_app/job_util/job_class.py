@@ -6,6 +6,7 @@ import traceback
 from typing import Tuple
 
 from async_app_fw.lib import hub
+from async_app_fw.lib.hub import app_hub
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
 from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobFeatureExe, MCPJobOutput, MCPJobStateChange
 from async_app_fw.utils import _listify
@@ -39,6 +40,7 @@ JOB_ANY_EXECEPT_SELF = 13
 JOB_OUTPUT = 14
 
 STATE_MAPPING = {
+    0: "JOB_ANY_STATE",
     1: "JOB_CREATE",
     3: "JOB_RUN",
     6: "JOB_STOP",
@@ -435,12 +437,21 @@ class Job:
         self._output_queue = asyncio.Queue()
         self.state_change_handler = set()
         self.LOG = logging.getLogger(f'Job init')
+        self._init_state_event()
 
         if remote_mode is True:
             assert remote_role in (REMOTE_AGENT, REMOTE_MATER)
             self.remote_role = remote_role
         else:
             self.change_state(JOB_CREATED)
+
+    def _init_state_event(self):
+        state_event = {}
+
+        for state in STATE_MAPPING.keys():
+            state_event[state] = asyncio.Event()
+
+        self.state_event = state_event
 
     async def _output_handler_loop(self):
         try:
@@ -572,6 +583,29 @@ class Job:
         pre = self.state
         self.state = state
         self.call_state_change_handler(pre)
+        self._set_state_change_event()
+
+    # return a task which is waiting state change.
+    def wait_state_change(self, target_state=JOB_ANY_STATE, timeout=5):
+        if target_state not in STATE_MAPPING:
+            raise ValueError(f'{target_state} is not existed.')
+
+        async def _wait_state_change():
+            if self.state != target_state:
+                await asyncio.wait_for(self.state_event[target_state].wait(), timeout=timeout)
+
+        return app_hub.spawn(_wait_state_change)
+
+    def _set_state_change_event(self):
+        state_event = self.state_event
+
+        # set event
+        state_event[JOB_ANY_STATE].set()
+        state_event[self.state].set()
+
+        # clear event
+        state_event[JOB_ANY_STATE].clear()
+        state_event[self.state].clear()
 
     def call_state_change_handler(self, previous):
         ev = JobEventStateChange(self, previous)
@@ -595,6 +629,7 @@ class Job:
                 f'State Change From Remote <{self.connection.address}>:\t {STATE_MAPPING[self.state]}  -> {STATE_MAPPING[after]}')
             pre = self.state
             self.state = after
+            self._set_state_change_event()
             self.call_state_change_handler(pre)
 
             if self.state == JOB_DELETED:
