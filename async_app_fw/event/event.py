@@ -13,6 +13,7 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import inspect
 from async_app_fw.controller.handler import FILTER_TYPE
 
@@ -48,7 +49,7 @@ class EventRequestBase(EventBase):
         self.dst = None  # app.name of provide the event.
         self.src = None
         self.sync = False
-        self.reply_q = None
+        self.reply_q = asyncio.Queue()
 
 
 class EventReplyBase(EventBase):

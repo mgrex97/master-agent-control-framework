@@ -3,10 +3,11 @@ import logging
 from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnection
 from async_app_fw.event.event import EventBase, EventReplyBase, EventRequestBase
 from async_app_fw.lib import hub
+from async_app_fw.lib.hub import app_hub
 from async_app_fw.protocol.mcp.mcp_parser_v_1_0 import MCPJobStateChange
 from custom_app.job_app.job_util.job_class import JOB_DELETE, JOB_FAIELD, Job, REMOTE_MATER
 from custom_app.job_app.job_util.job_subprocess import JobCommand
-from async_app_fw.base.app_manager import BaseApp
+from async_app_fw.base.app_manager import BaseApp, lookup_service_brick
 from async_app_fw.event.mcp_event import mcp_event
 from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
@@ -23,6 +24,24 @@ JOB_CREATE_SUCCESS = 0
 JOB_CREATE_FAIL = 1
 
 JOB_CREATE_LOCAL = 'local'
+
+spawn = app_hub.spawn
+
+
+class TargetAddressNotExist(Exception):
+    pass
+
+
+class RequestAlreadySend(Exception):
+    pass
+
+
+class RequestNotSendYetOrTimeout(Exception):
+    pass
+
+
+class JobCreateTimeoutError(Exception):
+    pass
 
 
 class EventJobManagerReady(EventBase):
@@ -46,6 +65,48 @@ class RequestJobCreate(EventRequestBase):
         self.address = address
         self.timeout = timeout
         self.stamp = stamp
+
+
+class RequestJobCreateV2(EventRequestBase):
+    def __init__(self, job, address=None, timeout=None, stamp=''):
+        super().__init__()
+        self.dst = APP_NAME
+        self.job = job
+        self.address = address
+        self.timeout = timeout
+        self.stamp = stamp
+        self.request_state = False
+
+    @classmethod
+    def send_request(cls, job, address=None, timeout=None, stamp=''):
+        req = RequestJobCreateV2(job, address=address,
+                                 timeout=timeout, stamp=stamp)
+
+        if req.request_state is True:
+            raise RequestAlreadySend(f'Job Create request has sent.')
+
+        async def _send_request():
+            req.request_state = True
+            service: JobMasterHandler = lookup_service_brick(APP_NAME)
+            service.send_event_to_self(req)
+            try:
+                res = await asyncio.wait_for(req.reply_q.get(), timeout=req.timeout)
+            except asyncio.TimeoutError as e:
+                raise JobCreateTimeoutError(
+                    f'Job Create timeout within {req.timeout} sec.')
+
+            req.request_state = False
+            if isinstance(res, Exception):
+                raise res
+            return res
+
+        return spawn(_send_request)
+
+    def push_reply(self, reply_data):
+        if self.request_state is False:
+            raise RequestNotSendYetOrTimeout('')
+
+        self.reply_q.put_nowait(reply_data)
 
 
 class ReplyJobCreate(EventReplyBase):
@@ -155,8 +216,15 @@ class JobMasterHandler(BaseApp):
                 f'xid {xid} not exist in CreateRequestManager.')
             return
 
-        rep = ReplyJobCreate.create_by_request(req, JOB_CREATE_SUCCESS)
-        self.send_event(req.src, rep)
+        # Compatible with oringal and v2.
+        if not hasattr(req, 'request_state'):
+            rep = ReplyJobCreate.create_by_request(req, JOB_CREATE_SUCCESS)
+            self.send_event(req.src, rep)
+        else:
+            try:
+                req.push_reply(True)
+            except RequestNotSendYetOrTimeout as e:
+                self.delete_job(req.job, req.address)
 
     @observe_event(mcp_event.EventMCPJobDeleteReply, MC_STABLE)
     def job_deleted_handler(self, ev):
@@ -246,6 +314,36 @@ class JobMasterHandler(BaseApp):
 
         if address == JOB_CREATE_LOCAL:
             self.job_managers[JOB_CREATE_LOCAL].add_job_with_new_id(job)
+        else:
+            # check ip
+            job.remote_mode = True
+            job.remote_role = REMOTE_MATER
+            job_manager: JobManager = self.job_managers[conn_id]
+            msg = job_manager.connection.mcproto_parser.MCPJobCreateRequest(
+                job_manager.connection, timeout=job.timeout, job_info=job.job_info_serialize())
+
+            # msg's xid is None, give new xid to msg.
+            job_manager.connection.set_xid(msg)
+            job_manager.add_request(xid=msg.xid, job_obj=job)
+            job_manager.connection.send_msg(msg)
+
+            self.create_request[conn_id].add_request(msg.xid, req)
+
+    @observe_event(RequestJobCreateV2, MC_STABLE)
+    def create_job_by_request(self, req: RequestJobCreateV2):
+        job: Job = req.job
+        address = req.address
+
+        if (conn_id := self.conn_map.get(address, None)) is None:
+            LOG.info(f'Client {address} not exist.')
+            job.change_state(JOB_FAIELD)
+            req.push_reply(TargetAddressNotExist(
+                f'The target agent({address}) which you want to create job is not exist.'))
+            return
+
+        if address == JOB_CREATE_LOCAL:
+            self.job_managers[JOB_CREATE_LOCAL].add_job_with_new_id(job)
+            req.push_reply(True)
         else:
             # check ip
             job.remote_mode = True
