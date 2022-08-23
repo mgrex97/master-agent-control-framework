@@ -401,7 +401,7 @@ class NormalFeature(object):
 
             if self.remote_mode is True and self.remote_role == REMOTE_MATER:
                 # send to remote
-                self._remote_normal_feature_exe(fun.__name__, *args, **kwargs)
+                return self._remote_normal_feature_exe(fun.__name__, *args, **kwargs)
             else:
                 fun(self, *args, **kwargs)
 
@@ -657,7 +657,10 @@ class Job:
         msg = MCPJobFeatureExe(self.connection, self.id,
                                self.state, feature_arg)
 
+        xid = self.connection.set_xid(msg)
+        kwargs['xid'] = xid
         self.connection.send_msg(msg)
+        return xid
 
     def get_remote_output(self, state, info=None):
         args = info['args']
