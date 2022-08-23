@@ -23,18 +23,21 @@ def mcp_msg_to_ev(msg):
     return mcp_msg_to_ev_cls(msg.__class__)(msg)
 
 
+# get Event class by msg name
 def mcp_msg_to_ev_cls(msg_cls):
     name = _mcp_msg_name_to_ev_name(msg_cls.__name__)
     return _MCP_MSG_EVENTS[name]
 
 
 def _create_mcp_msg_ev_class(msg_cls):
+    # Name: Event + msg_cls.__name__
     name = _mcp_msg_name_to_ev_name(msg_cls.__name__)
     logging.info(f'createing mcp_event {name}')
 
     if name in _MCP_MSG_EVENTS:
         return
 
+    # Create Classes Dynamically in Python.
     cls = type(name, (EventMCPMsgBase,),
                dict(__init__=lambda self, msg:
                     super(self.__class__, self).__init__(msg)))
