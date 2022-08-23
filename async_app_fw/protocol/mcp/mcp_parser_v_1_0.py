@@ -1,5 +1,7 @@
+import aiohttp
 import json
 import struct
+import pickle
 from async_app_fw.protocol.mcp import mcp_v_1_0 as mcproto
 from async_app_fw.lib.pack_utils import msg_pack_into
 from async_app_fw.protocol.mcp import mcp_parser
@@ -413,3 +415,265 @@ class MCPJobFeatureExe(MCPMsgBase):
                       self.buf, mcproto.MCP_HEADER_SIZE, self.job_id, self.state, self.info_len)
 
         self.buf.extend(self.info_bytes)
+
+class APIActionException(MCPMsgBase):
+    def __init__(self, mcp_connection, exception=None):
+        super().__init__(mcp_connection)
+        if not isinstance(exception, Exception):
+            raise ValueError(f'Input variable exception should be instance of class Exception.')
+
+        self.info_len = None
+        self.exception = exception
+        self.exception_bytes = None
+        # maximum size of info: 1024 bytes
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(MCPJobStateChange, cls).parser(
+            mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.info_len, ) = struct.unpack_from(
+            mcproto.API_ACTION_EXCEPTION_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.API_ACTION_EXCEPTION_SIZE
+
+        # retrive exception byte data
+        msg.exception_bytes = msg.buf[offset:]
+
+        if msg.info_len < len(msg.exception_bytes):
+            msg.exception_bytes = msg.exception_bytes[:msg.info_len]
+
+        # decode pickle byte
+        msg.exception = pickle.loads(msg.exception_bytes)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.exception is not None
+
+        self.excpetion_bytes = pickle.dumps(self.exception)
+        self.info_len = len(self.exception_bytes)
+
+        msg_pack_into(mcproto.API_ACTION_EXCEPTION_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.info_len)
+
+        self.buf.extend(self.exception_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.API_ACTION_LOGIN_EXCEPTION)
+class APILoginFailed(APIActionException):
+    pass
+
+@_register_parser
+@_set_msg_type(mcproto.API_ACTION_LOGIN)
+class APILogin(MCPMsgBase):
+    def __init__(self, mcp_connection, api_hostname=None, session_info=None):
+        super().__init__(mcp_connection)
+        self.api_hostname = api_hostname
+        self.session_info = session_info
+        self.json_bytes = None
+        self.len = None
+        # maximum size of info: 1024 bytes
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(APILogin, cls).parser(
+            mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.len, ) = struct.unpack_from(
+            mcproto.API_ACTION_LOGIN_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.API_ACTION_LOGIN_SIZE
+
+        # retrive exception byte data
+        msg.json_bytes = msg.buf[offset:]
+
+        if msg.len < len(msg.json_bytes):
+            msg.json_bytes = msg.json_bytes[:msg.len]
+
+        # decode json
+        data = json.loads(msg.json_bytes.decode('utf-8'))
+
+        msg.api_hostname = data['api_hostname']
+        msg.session_info = data['session_info']
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.api_hostname is not None
+
+        data = json.dumps({
+            'api_hostname': self.api_hostname,
+            'session_info': self.session_info
+        })
+
+        self.excpetion_bytes = json.dumps(data).encode('utf-8')
+        self.len = len(data)
+
+        msg_pack_into(mcproto.API_ACTION_LOGIN_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.len)
+
+        self.buf.extend(data)
+
+@_register_parser
+@_set_msg_type(mcproto.API_ACTION_LOGIN_RESPONSE)
+class APILoginResponse(MCPMsgBase):
+    def __init__(self, mcp_connection, api_hostname=None, auth=None):
+        super().__init__(mcp_connection)
+        self.api_hostname = api_hostname
+        self.auth = auth
+        self.data_len = None
+        # maximum size of info: 1024 bytes
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(APILoginResponse, cls).parser(
+            mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.data_len, ) = struct.unpack_from(
+            mcproto.API_ACTION_LOGIN_RESPONSE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.API_ACTION_LOGIN_RESPONSE_SIZE
+
+        data_bytes = msg.buf[offset:]
+
+        if msg.data_len < len(data_bytes):
+            data_bytes = data_bytes[:msg.data_len]
+
+        # decode json
+        data = json.loads(data_bytes.decode('utf-8'))
+
+        msg.api_hostname = data['api_hostname']
+        msg.auth = data['auth']
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.api_hostname is not None
+
+        data = json.dumps({
+            'api_hostname': self.api_hostname,
+            'auth': self.auth
+        })
+
+        data_bytes = json.dumps(data).encode('utf-8')
+        self.data_len = len(data_bytes)
+
+        msg_pack_into(mcproto.API_ACTION_LOGIN_RESPONSE_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.data_len)
+
+        self.buf.extend(data)
+
+
+@_register_parser
+@_set_msg_type(mcproto.API_ACTION_REQUEST)
+class APIActionRequest(MCPMsgBase):
+    method_to_int= {
+        'post': 0,
+        'get': 1,
+        'put': 2,
+        'delete': 3,
+        'patch': 4
+    }
+
+    # reverse
+    int_to_method = {key:method for method, key in method_to_int.items()} 
+
+    def __init__(self, mcp_connection, hostname=None, method=None, auth=None, base_url=None, args=None, kwargs=None):
+        super().__init__(mcp_connection)
+        self.hostname = hostname
+        self.method = method
+        self.auth = auth
+        self.base_url = base_url
+        self.args = args
+        self.kwargs = kwargs
+        self.len = None
+        # maximum size of info: 1024 bytes
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(APIActionRequest, cls).parser(
+            mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (method, msg.len, ) = struct.unpack_from(
+            mcproto.API_ACTION_REQUEST_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        # decode method
+        msg.method = cls.int_to_method[method]
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.API_ACTION_REQUEST_SIZE
+
+        # retrive exception byte data
+        json_bytes = msg.buf[offset:]
+
+        if msg.len < len(json_bytes):
+            json_bytes = json_bytes[:msg.len]
+
+        # decode json
+        data = json.loads(json_bytes.decode('utf-8'))
+
+        msg.hostname = data['hostname']
+        msg.base_url = data['base_url']
+        msg.auth = data['auth']
+        msg.args = data['args']
+        msg.kwargs = data['kwargs']
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.method is not None
+
+        data = {
+            'auth': self.auth,
+            'hostname': self.hostname,
+            'base_url': self.base_url,
+            'args': self.args,
+            'kwargs': self.kwargs
+        }
+
+        json_bytes = json.dumps(data).encode('utf-8')
+        self.len = len(json_bytes)
+
+        method = self.method_to_int[self.method]
+        msg_pack_into(mcproto.API_ACTION_REQUEST_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, method, self.len)
+
+        self.buf.extend(json_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.API_ACTION_RESPONSE)
+class APIActionResponse(MCPMsgBase):
+    def __init__(self, mcp_connection, response: aiohttp.ClientResponse = None):
+        super().__init__(mcp_connection)
+        self.response = response
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(APIActionResponse, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.len, ) = struct.unpack_from(
+            mcproto.API_ACTION_RESPONSE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.API_ACTION_RESPONSE_SIZE
+
+        resp_bytes = msg.buf[offset:]
+
+        if msg.len < len(resp_bytes):
+            resp_bytes = resp_bytes[:msg.len]
+
+        # decode json
+        msg.response = pickle.loads(resp_bytes)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.response is not None
+
+        resp_bytes = pickle.dumps(self.response)
+        self.len = len(resp_bytes)
+
+        msg_pack_into(mcproto.API_ACTION_RESPONSE_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.len)
+
+        self.buf.extend(resp_bytes)
