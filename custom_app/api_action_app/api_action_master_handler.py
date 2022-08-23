@@ -75,6 +75,11 @@ def _remote_request_decorator(fun):
         else:
             # send request (Event) to APIActionMasterController to deal with remote request.
             res = await ReqSendRequestFromRemote.send_request(agent, method_name, self, *args, timeout=timeout, **kwargs)
+
+            if (callback := (kwargs.get('callback', None))) is not None:
+                callback(res)
+ 
+            return res
         
         return res
 
