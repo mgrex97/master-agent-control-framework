@@ -74,7 +74,7 @@ class TaskLoop(object):
 
         return task
 
-    def wait_tasks(self):
+    def wait_tasks(self) -> asyncio.Task:
         async def _wait_tasks():
             async for _ in self:
                 pass
