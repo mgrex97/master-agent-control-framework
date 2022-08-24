@@ -69,7 +69,9 @@ LOG = logging.getLogger(f"APP service <{APP_NAME}: ")
 def _remote_request_decorator(fun):
     method = getattr(fun, '_method_name')
 
-    async def _remote_send_request(self, *args, agent=AGENT_LOCAL, timeout=REMOTE_REQUEST_DEFAULT_TIMEOUT,method_name=method, **kwargs):
+    async def _remote_send_request(self, *args, agent=None, timeout=REMOTE_REQUEST_DEFAULT_TIMEOUT,method_name=method, **kwargs):
+        agent = agent or self.default_agent
+
         if agent == AGENT_LOCAL:
             res = await fun(self, *args, *kwargs)
         else:
@@ -84,6 +86,19 @@ def _remote_request_decorator(fun):
         return res
 
     return _remote_send_request
+
+def _remote_request_init_decorator(cls: APIAction):
+    init_method = cls.__init__
+
+    def __init__(self: APIAction, *args, default_agent=AGENT_LOCAL, **kwargs):
+        init_method(self, *args, **kwargs)
+        self.default_agent = default_agent
+ 
+    def set_default_agent(self, default_agent):
+        self.default_agent = default_agent
+ 
+    cls.__init__ = init_method
+    cls.set_default_agent = set_default_agent
 
 
 class APIActionMasterController(BaseApp):
@@ -106,6 +121,11 @@ class APIActionMasterController(BaseApp):
         # For remote feature.
         if self.APIAction_decorate_yet is False:
             APIAction.get = _remote_request_decorator(APIAction.get)
+            APIAction.post = _remote_request_decorator(APIAction.post)
+            APIAction.put = _remote_request_decorator(APIAction.put)
+            APIAction.delete = _remote_request_decorator(APIAction.delete)
+            APIAction.patch = _remote_request_decorator(APIAction.patch)
+            _remote_request_decorator(APIAction)
 
             self.APIAction_decorate_yet = True
 
