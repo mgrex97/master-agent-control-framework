@@ -30,7 +30,8 @@ class InfoCollector(ABC):
         self.agent = agent
         self._interval = interval
         self._requset_timeout = request_timeout
-        self.info_collect_task = None
+        self._info_collect_task = None
+        self.collect_task = []
 
     async def start(self, interval=None):
         # get APIaction from 
@@ -47,15 +48,22 @@ class InfoCollector(ABC):
         interval = interval or self._interval
         self.change_interval(interval)
 
-        self.info_collect_task = spawn(self.info_collect_loop)
+        self._info_collect_task = spawn(self.info_collect_loop)
 
     @abstractmethod
     async def init_info(self):
         pass
  
     async def stop(self):
-        task_loop = TaskLoop(app_hub, [task for _, task in self.collect_task.items()])
-        await task_loop.wait_tasks()
+        if self._info_collect_task is not None and not self._info_collect_task.done():
+            self.collect_task.append(self._info_collect_task)
+
+        if len(self.collect_task) > 0:
+            for task in self.collect_task:
+                if not task.done():
+                    task.cancel()
+
+            await asyncio.wait(self.collect_task)
 
     async def info_collect_loop(self):
         while True:
