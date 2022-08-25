@@ -70,6 +70,9 @@ def _remote_request_decorator(fun):
     method = getattr(fun, '_method_name')
 
     async def _remote_send_request(self, *args, agent=None, timeout=REMOTE_REQUEST_DEFAULT_TIMEOUT,method_name=method, **kwargs):
+        if getattr(self, 'default_agent', None) is None:
+            self.default_agent = AGENT_LOCAL
+
         agent = agent or self.default_agent
 
         if agent == AGENT_LOCAL:
@@ -125,9 +128,16 @@ class APIActionMasterController(BaseApp):
             APIAction.put = _remote_request_decorator(APIAction.put)
             APIAction.delete = _remote_request_decorator(APIAction.delete)
             APIAction.patch = _remote_request_decorator(APIAction.patch)
-            _remote_request_decorator(APIAction)
+            _remote_request_init_decorator(APIAction)
 
             self.APIAction_decorate_yet = True
+
+    async def close(self):
+        await super().close()
+
+        # make sure all of the api_action's connection are closed.
+        for _, api_action in self.api_action.items():
+            await api_action.close()
 
     @observe_event(mcp_event.EventMCPStateChange, MC_STABLE)
     def agent_join(self, ev):
