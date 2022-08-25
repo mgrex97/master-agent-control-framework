@@ -5,10 +5,11 @@ from async_app_fw.controller.mcp_controller.master_controller import MachineCont
 from async_app_fw.lib.hub import app_hub
 from async_app_fw.event.mcp_event import mcp_event
 from async_app_fw.event import event
-from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_FEATURE, MC_HANDSHAK, MC_STABLE
+from async_app_fw.controller.mcp_controller.mcp_state import \
+    MC_DISCONNECT, MC_FEATURE, MC_HANDSHAK, MC_STABLE
 
 LOG = logging.getLogger(
-    'eventlent_framework.controller.mcp_controller.agent_controller')
+    'async_app_fw.controller.mcp_controller.agent_controller')
 
 
 class MCPMasterHandler(BaseApp):
@@ -24,9 +25,25 @@ class MCPMasterHandler(BaseApp):
     def start(self):
         task = super(MCPMasterHandler, self).start()
         self.controller = MachineControlMasterController()
-
-        app_hub.spawn(self.controller.server_loop)
+        self.controller.start()
         return task
+
+    async def close(self):
+        await super().close()
+
+        for _, connection in self.connection_dict.items():
+            # connection.set_state(MC_DISCONNECT)
+            await connection.stop_serve()
+
+        del self.connection_dict
+        self.connection_dict = {}
+
+        if  self.controller is not None \
+            and isinstance(self.controller, MachineControlMasterController):
+
+            await self.controller.stop()
+            del self.controller
+            self.controller = None
 
     @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
     def disconnecting_handler(self, ev: event.EventSocketConnecting):
