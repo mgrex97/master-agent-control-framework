@@ -65,7 +65,7 @@ async def machine_connection_factory(reader: StreamReader, writer: StreamWriter)
 
     with contextlib.closing(AgentConnection(reader, writer)) as machine_connection:
         try:
-            serve_task = hub.app_hub.spawn(machine_connection.serve)
+            serve_task = machine_connection.serve()
             await serve_task
         except Exception as e:
             # Something went wrong.
@@ -83,6 +83,7 @@ async def machine_connection_factory(reader: StreamReader, writer: StreamWriter)
             raise
             """
         finally:
-            LOG.info(f'Disconnect to {address}')
             serve_task.cancel()
+            await serve_task
+            LOG.info(f'Disconnect to {address}')
             machine_connection.set_state(MC_DISCONNECT)
