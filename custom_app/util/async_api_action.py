@@ -1,14 +1,11 @@
 import asyncio
-from cgitb import text
 from dataclasses import dataclass
 import base64
-from nturl2path import url2pathname
 import re
 import logging
 import traceback
 import aiohttp
 from async_app_fw.lib.hub import app_hub
-from async_app_fw.base.app_manager import lookup_service_brick
 
 def encrpt_password(pw):
     encrpt_pw = str(base64.b64encode(pw.encode()), 'utf-8')
@@ -253,6 +250,11 @@ class APIAction:
             if isinstance(self.request_session, aiohttp.ClientSession):
                 await self.request_session.close()
                 del self.request_session
+
+    async def close(self):
+        if isinstance(self.request_session, aiohttp.ClientSession):
+            await self.request_session.close()
+            del self.request_session
 
     def __del__(self):
         self._wait_cancel_task.cancel()
