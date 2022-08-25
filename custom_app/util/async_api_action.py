@@ -1,4 +1,3 @@
-import asyncio
 from dataclasses import dataclass
 import base64
 import re
@@ -101,8 +100,6 @@ class APIAction:
 
         if auth is not None:
             self.set_auth(auth)
-        
-        self._wait_cancel_task = app_hub.spawn(self._cancel_detector)
 
     def get_session_info(self, api_hostname):
         info = SessionInfo(
@@ -239,17 +236,6 @@ class APIAction:
         self.auth = auth
         # apply to session's header
         self.request_session.headers['Authorization'] = f"Bearer {auth}"
-
-    # After test end, this corotines is going to receive CancelledError, then close the ClientSession.
-    async def _cancel_detector(self):
-        t = asyncio.current_task()
-        try:
-            await asyncio.sleep(3600)
-        except asyncio.CancelledError as e:
-            # release client session.
-            if isinstance(self.request_session, aiohttp.ClientSession):
-                await self.request_session.close()
-                del self.request_session
 
     async def close(self):
         if isinstance(self.request_session, aiohttp.ClientSession):
