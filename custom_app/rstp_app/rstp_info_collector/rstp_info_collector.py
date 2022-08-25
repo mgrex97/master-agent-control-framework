@@ -27,9 +27,10 @@ spawn = app_hub.spawn
 
 class RstpInfoCollector(InfoCollector, ABC):
     async def init_info(self):
-        await self.request_role(time())
-        await self.request_state(time())
-        await self.request_priority(time())
+        current_time = time()
+        await self.request_role(current_time)
+        await self.request_state(current_time)
+        await self.request_priority(current_time)
 
     async def get_info(self):
         current_time = time()
