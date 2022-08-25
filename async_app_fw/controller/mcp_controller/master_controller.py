@@ -1,5 +1,3 @@
-from socket import TCP_NODELAY
-from socket import IPPROTO_TCP
 import traceback
 import logging
 import contextlib
@@ -19,11 +17,22 @@ class MachineControlMasterController(object):
         self.listen_host = listen_host
         self.listen_port = listen_port
         self._clients = {}
+        self._server_loop_task = None
+
+    def start(self):
+        self._server_loop_task = app_hub.spawn(self.server_loop)
+
+    async def stop(self):
+        if self._server_loop_task is not None:
+            # wait server_loop stop.
+            self._server_loop_task.cancel()
+            await self._server_loop_task
 
     async def server_loop(self):
-        server = hub.StreamServer(
+        self._server = hub.StreamServer(
             (self.listen_host, self.listen_port), machine_connection_factory)
-        await server.serve_forever()
+
+        await self._server.serve_forever()
 
 
 class MasterConnection(MachineConnection):
