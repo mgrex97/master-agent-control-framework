@@ -20,14 +20,14 @@ def _is_step_function(step_fun):
 
 
 class Step():
-    def __init__(self, name, while_mode=False, input_names=[], no_queue=False, auto_start=True) -> None:
+    def __init__(self, name, while_mode=False, input_names=[], no_queue=False, auto_start=True, ignore_exception=True):
         self.name = name
         self.no_queue = no_queue
         self.input_name = set(input_names)
         self.step_task = []
         self.while_mode = while_mode
         self.auto_start = auto_start
-        # one more mode coro mode.
+        self.ignore_exception = ignore_exception
 
     def __call__(_self, fun):
         async def _step(self, input_name):
@@ -59,8 +59,13 @@ class Step():
                         logging.info('no queue await')
                         await fun(self)
                 except Exception as e:
-                    self.LOG.warning(
-                        f'Exception happend when step <{_self.name}> get input from queue:\n{traceback.format_exc()}')
+                    if _self.ignore_exception is False:
+                        self.result = e
+                        self.exception_event.set()
+                        break
+                    else:
+                        self.LOG.warning(
+                            f'Exception happend when step <{_self.name}> get input from queue:\n{traceback.format_exc()}')
 
                 if _self.while_mode is False:
                     break
@@ -180,7 +185,7 @@ class AsyncTestApp(BaseApp):
     def stop_test(self, result=None):
         self.LOG.info(f'Stop Test {self.name}')
 
-        self.result = result
+        self.result = result or self.result
 
         for step_name, step_fun in self.step_dict.items():
             self.LOG.info(f'Stop test step: {step_name}')
@@ -194,6 +199,7 @@ class AsyncTestApp(BaseApp):
     async def _exception_detector(self):
         try:
             await self.exception_event.wait()
+            self.stop_test()
         except CancelledError as e:
             pass
 
@@ -205,6 +211,10 @@ class AsyncTestApp(BaseApp):
 
     async def wait_test_end(self):
         await self.end_event.wait()
+
+        if isinstance(self.result, Exception):
+            raise self.result
+
         return self.result
 
     async def _event_loop(self):
