@@ -215,9 +215,15 @@ class StreamServer(object):
             await self._init_server()
 
         async with self.server:
-            self.LOG.info('Stream Sever start to serve.')
-            await self.server.wait_closed()
-            self.LOG.info('Stream Sever serve end.')
+            try:
+                self.LOG.info('Stream Sever start to serve.')
+                await self.server.wait_closed()
+                self.LOG.info('Stream Sever serve end.')
+            except asyncio.CancelledError:
+                self.server.close()
+            finally:
+                await self.server.wait_closed()
+                self.LOG.info('Stop Stream server')
 
 
 class StreamClient(object):
