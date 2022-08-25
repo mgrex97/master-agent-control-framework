@@ -92,6 +92,8 @@ def _deactivate(method):
 
     return deactivate
 
+class MachineConnectionIsServing(Exception):
+    pass
 
 class MachineConnection(object):
     def __init__(self, reader: StreamReader, writer: StreamWriter, mcp_brick_name):
@@ -116,6 +118,7 @@ class MachineConnection(object):
         self.mcp_brick: BaseApp = lookup_service_brick(
             mcp_brick_name)
         self.set_state(MC_HANDSHAK)
+        self._serve_task = None
 
     def _close_write(self):
         # Note: Close only further sends in order to wait for the switch to
@@ -166,6 +169,8 @@ class MachineConnection(object):
                     # on SSL socket read timeout; re-try the loop in this case.
                     continue
                 except (EOFError, IOError):
+                    break
+                except CancelledError as e:
                     break
 
                 if not ret:
@@ -272,30 +277,45 @@ class MachineConnection(object):
             return await self.send(msg.buf, close_socket=close_socket)
         return hub.app_hub.spawn(_send_msg, msg, close_socket)
 
-    async def serve(self):
-        send_loop_task = hub.app_hub.spawn(self._send_loop)
+    async def stop_serve(self):
+        if isinstance(self._serve_task, asyncio.Task) and not self._serve_task.done():
+            self._serve_task.cancel()
+            await self._serve_task
+        
+        self._serve_task = None
 
-        # send connection event
-        connect_ev = event.EventSocketConnecting(self)
+    def serve(self):
+        async def serve():
+            send_loop_task = hub.app_hub.spawn(self._send_loop)
+    
+            # send connection event
+            connect_ev = event.EventSocketConnecting(self)
+    
+            if self.mcp_brick is not None:
+                self.mcp_brick.send_event_to_observers(connect_ev)
+                handlers = self.mcp_brick.get_handlers(
+                    connect_ev, MC_HANDSHAK)
+    
+                for handler in handlers:
+                    handler(connect_ev)
+    
+            # send socket connecting event
+            exception = None
+            try:
+                recv_loop_task = hub.app_hub.spawn(self._recv_loop)
+                await recv_loop_task
+            except Exception as e:
+                exception = e
+            finally:
+                hub.app_hub.kill(send_loop_task)
+                hub.app_hub.kill(recv_loop_task)
+                self.is_active = False
+                if exception is not None:
+                    raise exception
+        
+        if self._serve_task is not None:
+            raise MachineConnectionIsServing()
+        
+        self._serve_task = hub.app_hub.spawn(serve)
 
-        if self.mcp_brick is not None:
-            self.mcp_brick.send_event_to_observers(connect_ev)
-            handlers = self.mcp_brick.get_handlers(
-                connect_ev, MC_HANDSHAK)
-
-            for handler in handlers:
-                handler(connect_ev)
-
-        # send socket connecting event
-        exception = None
-        try:
-            recv_loop_task = hub.app_hub.spawn(self._recv_loop)
-            await recv_loop_task
-        except Exception as e:
-            exception = e
-        finally:
-            hub.app_hub.kill(send_loop_task)
-            hub.app_hub.kill(recv_loop_task)
-            self.is_active = False
-            if exception is not None:
-                raise exception
+        return self._serve_task
