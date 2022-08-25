@@ -241,6 +241,3 @@ class APIAction:
         if isinstance(self.request_session, aiohttp.ClientSession):
             await self.request_session.close()
             del self.request_session
-
-    def __del__(self):
-        self._wait_cancel_task.cancel()
