@@ -3,17 +3,16 @@ from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
 from async_app_fw.event.mcp_event import mcp_event
-from custom_app.api_action_app.api_action_master_handler import APP_NAME
 from custom_app.api_action_app.exception import SessionInfoNotExist
 from custom_app.util.async_api_action import APIAction, RemoteResponse, SessionInfo
 from async_app_fw.lib.hub import app_hub
+from .constant import API_ACTION_CONTROLLER_AGENT_APP_NAME as APP_NAME
 
 spawn = app_hub.spawn
 
 _REQUIRED_APP = [
     'async_app_fw.controller.mcp_controller.master_handler']
 
-APP_NAME = 'api_action_agent_controller'
 
 class APIActionAgentController(BaseApp):
     def __init__(self, *_args, **_kwargs):

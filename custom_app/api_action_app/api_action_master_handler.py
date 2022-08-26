@@ -1,111 +1,26 @@
-import inspect
 import logging
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.lib.hub import app_hub
 from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
 from async_app_fw.event.mcp_event import mcp_event
-from async_app_fw.event.async_event import EventAsyncRequestBase
+from async_app_fw.event import event
 from custom_app.api_action_app.exception import AgentNotExist, AuthNotExist, CantFindAgent, LoginInfoNotExist, SessionInfoNotExist
 from custom_app.util.async_api_action import APIAction, APIActionNotExist, SessionInfo
+from .constant import API_ACTION_CONTROLLER_MASTER_APP_NAME as APP_NAME, AGENT_LOCAL
+from .master_lib import event as api_event
+from .master_lib.util import remote_request_decorator, remote_request_init_decorator
 
 _REQUIRED_APP = [
     'async_app_fw.controller.mcp_controller.master_handler']
 
 spawn = app_hub.spawn
-
-APP_NAME = 'api_action_master_handler'
-DEFAULT_LOGIN_TIMEOUT = 5
-DEFAULT_SESSION_INIT_TIMEOUT = 5
-REMOTE_REQUEST_DEFAULT_TIMEOUT = 300 # 5 mins
-AGENT_LOCAL = 'local'
-
-class ReqSessionInit(EventAsyncRequestBase):
-    REQUEST_NAME = 'API Session Init'
-    DST_NAME = APP_NAME
-
-    def __init__(self, api_hostname, base_url, login_info=None, auth=None, timeout=DEFAULT_SESSION_INIT_TIMEOUT):
-        super().__init__(timeout)
-        self.session_info = SessionInfo(
-            api_hostname,
-            base_url,
-            login_info,
-            auth
-        )
-
-class ReqAPILoginCheck(EventAsyncRequestBase):
-    REQUEST_NAME = 'API login check'
-    DST_NAME = APP_NAME
-
-    def __init__(self, api_hostname, session_info=None, agent_address=AGENT_LOCAL, timeout=DEFAULT_LOGIN_TIMEOUT):
-        super().__init__(timeout=timeout)
-        self.api_hostname = api_hostname
-        self.session_info = session_info
-        self.agent_address = agent_address
-
-class ReqSendRequestFromRemote(EventAsyncRequestBase):
-    REQUEST_NAME = 'Rquest from remote agent.'
-    DST_NAME = APP_NAME
-
-    def __init__(self, agent, method, api_action, *args, timeout=None, **kwargs):
-        super().__init__(timeout=timeout)
-        self.agent = agent
-        self.method = method
-        self.api_action = api_action
-        self.args = args
-        self.kwargs = kwargs
-
-class ReqGetAPIAction(EventAsyncRequestBase):
-    REQUEST_NAME = 'Get API Action'
-    DST_NAME = APP_NAME
-
-    def __init__(self, api_hostname, timeout=None):
-        super().__init__(timeout=timeout)
-        self.api_hostname = api_hostname
-
 LOG = logging.getLogger(f"APP service <{APP_NAME}: ")
-
-# This decorator make request methods(post,get...) have ability to execute request on agent.
-def _remote_request_decorator(fun):
-    method = getattr(fun, '_method_name')
-
-    async def _remote_send_request(self, *args, agent=None, timeout=REMOTE_REQUEST_DEFAULT_TIMEOUT,method_name=method, **kwargs):
-        if getattr(self, 'default_agent', None) is None:
-            self.default_agent = AGENT_LOCAL
-
-        agent = agent or self.default_agent
-
-        if agent == AGENT_LOCAL:
-            res = await fun(self, *args, *kwargs)
-        else:
-            # send request (Event) to APIActionMasterController to deal with remote request.
-            res = await ReqSendRequestFromRemote.send_request(agent, method_name, self, *args, timeout=timeout, **kwargs)
-
-            if (callback := (kwargs.get('callback', None))) is not None:
-                callback(res)
- 
-            return res
-        
-        return res
-
-    return _remote_send_request
-
-def _remote_request_init_decorator(cls: APIAction):
-    init_method = cls.__init__
-
-    def __init__(self: APIAction, *args, default_agent=AGENT_LOCAL, **kwargs):
-        init_method(self, *args, **kwargs)
-        self.default_agent = default_agent
- 
-    def set_default_agent(self, default_agent):
-        self.default_agent = default_agent
- 
-    cls.__init__ = init_method
-    cls.set_default_agent = set_default_agent
 
 
 class APIActionMasterController(BaseApp):
     APIAction_decorate_yet = False
+    _EVENTS = event.get_event_from_module(api_event)
 
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
@@ -123,12 +38,12 @@ class APIActionMasterController(BaseApp):
         # decorate APIAction's method(get,post...) function.
         # For remote feature.
         if self.APIAction_decorate_yet is False:
-            APIAction.get = _remote_request_decorator(APIAction.get)
-            APIAction.post = _remote_request_decorator(APIAction.post)
-            APIAction.put = _remote_request_decorator(APIAction.put)
-            APIAction.delete = _remote_request_decorator(APIAction.delete)
-            APIAction.patch = _remote_request_decorator(APIAction.patch)
-            _remote_request_init_decorator(APIAction)
+            APIAction.get = remote_request_decorator(APIAction.get)
+            APIAction.post = remote_request_decorator(APIAction.post)
+            APIAction.put = remote_request_decorator(APIAction.put)
+            APIAction.delete = remote_request_decorator(APIAction.delete)
+            APIAction.patch = remote_request_decorator(APIAction.patch)
+            remote_request_init_decorator(APIAction)
 
             self.APIAction_decorate_yet = True
 
@@ -164,8 +79,8 @@ class APIActionMasterController(BaseApp):
                 pass
         """
 
-    @observe_event(ReqGetAPIAction)
-    def get_api_action(self, ev:ReqGetAPIAction):
+    @observe_event(api_event.ReqGetAPIAction)
+    def get_api_action(self, ev:api_event.ReqGetAPIAction):
         api_hostname = ev.api_hostname
 
         if (api_action := self.api_action.get(api_hostname, None)) is None:
@@ -174,8 +89,8 @@ class APIActionMasterController(BaseApp):
         
         ev.push_reply(api_action)
 
-    @observe_event(ReqAPILoginCheck)
-    def check_login(self, ev: ReqAPILoginCheck):
+    @observe_event(api_event.ReqAPILoginCheck)
+    def check_login(self, ev: api_event.ReqAPILoginCheck):
         api_hostname = ev.api_hostname
         agent_address= ev.agent_address
 
@@ -197,14 +112,14 @@ class APIActionMasterController(BaseApp):
     def remote_login_reply_handler(self, ev):
         pass
 
-    async def _login(self, ev: ReqAPILoginCheck):
+    async def _login(self, ev: api_event.ReqAPILoginCheck):
         api_hostname = ev.api_hostname
         session_info: SessionInfo = ev.session_info or self.session_info.get(ev.api_hostname)
 
         # api_action hasn't existed yet. Create a new one.
         if (api_action := self.api_action.get(ev.api_hostname, None)) is None:
             if session_info is None:
-                ReqAPILoginCheck.push_reply(SessionInfoNotExist())
+                ev.push_reply(SessionInfoNotExist())
                 return
 
             api_action = APIAction(session_info.base_url, session_info.login_info, session_info.auth)
@@ -226,8 +141,8 @@ class APIActionMasterController(BaseApp):
         self.api_action_to_name[api_action] = api_hostname
         ev.push_reply(api_action)
 
-    @observe_event(ReqSessionInit)
-    def init_session_info(self, ev: ReqSessionInit):
+    @observe_event(api_event.ReqSessionInit)
+    def init_session_info(self, ev: api_event.ReqSessionInit):
         session_info = ev.session_info
 
         if self.session_info.get(session_info.api_hostname, None) is not None:
@@ -253,10 +168,10 @@ class APIActionMasterController(BaseApp):
     def remote_api_exception_handler(self, ev):
         pass
 
-    @observe_event(ReqSendRequestFromRemote)
-    def request_from_remote(self, ev: ReqSendRequestFromRemote):
+    @observe_event(api_event.ReqSendRequestFromRemote)
+    def request_from_remote(self, ev: api_event.ReqSendRequestFromRemote):
         if (conn := self.agent_connection.get(ev.agent, None)) is None: 
-            ev.push_reply(AgentNotExist())
+            ev.push_reply(AgentNotExist(f"Agent <{ev.agent}>"))
             return
 
         api_action: APIAction = ev.api_action
