@@ -98,9 +98,8 @@ class APIAction:
         if auth is not None:
             self.set_auth(auth)
 
-    def get_session_info(self, api_hostname):
+    def get_session_info(self):
         info = SessionInfo(
-            api_hostname,
             self.base_url,
             self.login_info,
             self.auth
