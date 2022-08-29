@@ -1,3 +1,4 @@
+import logging
 import traceback
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.controller.handler import observe_event
@@ -11,17 +12,16 @@ from .constant import API_ACTION_CONTROLLER_AGENT_APP_NAME as APP_NAME
 spawn = app_hub.spawn
 
 _REQUIRED_APP = [
-    'async_app_fw.controller.mcp_controller.master_handler']
+    'async_app_fw.controller.mcp_controller.agent_handler']
 
+LOG = logging.getLogger("APIAction Agent Controller")
 
 class APIActionAgentController(BaseApp):
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
         self.name = APP_NAME
         self.conn = None
-        self.session_info = {}
         self.api_action = {}
-
 
     @observe_event(mcp_event.EventMCPStateChange, MC_STABLE)
     def connect_master(self, ev):
@@ -36,59 +36,54 @@ class APIActionAgentController(BaseApp):
 
 
     @observe_event(mcp_event.EventAPILogin)
-    def check_login(self, ev):
-        spawn()
+    def login_handler(self, ev):
+        spawn(self._login, ev.msg)
 
-
-    async def login(self, api_hostname, session_info:SessionInfo, xid=None):
+    async def _login(self, login_msg):
         conn = self.conn
+        api_action_id = login_msg.api_action_id
+        logging.info(login_msg.session_info)
+        session_info = SessionInfo(**login_msg.session_info)
+        args = login_msg.args
+        kwargs = login_msg.kwargs
+        
         try:
             # api_action hasn't existed yet. Create a new one.
-            if (api_action := self.api_action.get(api_hostname, None)) is None:
+            if (api_action := self.api_action.get(api_action_id, None)) is None:
                 if session_info is None:
-                    raise SessionInfoNotExist
-    
-                api_action = APIAction(session_info.base_url, session_info.login_info, session_info.auth)
-            
+                    raise SessionInfoNotExist(f"Login into APIAction failed.")
+
+                api_action = APIAction(session_info.base_url, session_info.login_info, auth=session_info.auth) 
+
                 # save new api_action
-                self.api_action[api_hostname] = api_action
+                self.api_action[api_action_id] = api_action
     
-            await api_action.login_api(session_info.login_info)
+            auth = await api_action.login_api(*args, **kwargs)
+
+            msg = conn.mcproto_parser.APILoginResponse(
+                conn, api_action_id, auth)
 
         except Exception as e:
-            # send exception info
-            if xid is not None and conn is not None:
-                msg = conn.mcproto_parser.APILoginFailed(e)
-                msg.xid = xid
-                conn.send_msg(msg)
-
-            raise e
-
-        # get Session info
-        session_info = api_action.get_APIAction(api_hostname)
-        # update
-        self.session_info[api_hostname] = session_info
-
-        if xid is not None and conn is not None:
-            # send login result to master
-            msg = conn.mcproto_parser.APILoginResponse(
-                conn, api_hostname, session_info)
-            msg.xid = xid
-            conn.send_msg(msg)
+            msg = conn.mcproto_parser.APILoginFailed(e)
+            
+            LOG.warning(f"API Login Failed.")
+ 
+        msg.xid = login_msg.xid
+        conn.send_msg(msg)
 
     @observe_event(mcp_event.EventAPIActionRequest)
     def api_action_request_handler(self, ev):
         msg = ev.msg
 
-        # get api_action by hostname
-        if (api_action := self.api_action.get(msg.hostname, None)) is None:
+        # get api_action by api_action_id
+        if (api_action := self.api_action.get(msg.api_action_id, None)) is None:
             api_action = APIAction(msg.base_url, None, auth=msg.auth)
-            self.api_action[msg.hostname] = api_action
+            self.api_action[msg.api_action_id] = api_action
 
         # set auth
         api_action.set_auth(msg.auth)
 
-        # Create a new task to handle request.
+        # Create a new task to send request.
         spawn(self.send_api_request, msg.xid, api_action, msg.method, msg.args, msg.kwargs)
 
     async def send_api_request(self, xid, api_action, method_name, args, kwargs):
