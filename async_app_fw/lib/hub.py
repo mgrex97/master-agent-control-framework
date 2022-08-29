@@ -259,7 +259,6 @@ class StreamClient(object):
                 self.LOG.info(f'connect_loop stop. Get CancelledError.')
             except asyncio.CancelledError:
                 self.LOG.info(f'connect_loop interrpute.')
-                pass
 
         return app_hub.spawn(_connect_loop, handle, interval)
 
