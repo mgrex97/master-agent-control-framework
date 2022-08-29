@@ -75,9 +75,6 @@ class CannotFindAuth(Exception):
     pass
 
 
-SwitchAPIActionSave = {}
-
-
 class APIAction:
     def __init__(self, base_url, login_info: dict, auth=None):
         self.request_session = aiohttp.ClientSession(

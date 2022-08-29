@@ -1,4 +1,4 @@
-from ..constant import API_ACTION_MASTER_APP_NAME as APP_NAME, AGENT_LOCAL\
+from ..constant import API_ACTION_CONTROLLER_MASTER_APP_NAME as APP_NAME, AGENT_LOCAL\
     , DEFAULT_SESSION_INIT_TIMEOUT, DEFAULT_LOGIN_TIMEOUT
 from custom_app.util.async_api_action import SessionInfo
 from async_app_fw.event.async_event import EventAsyncRequestBase
