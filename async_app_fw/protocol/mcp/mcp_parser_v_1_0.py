@@ -1,3 +1,4 @@
+import dataclasses
 import aiohttp
 import json
 import struct
@@ -460,18 +461,14 @@ class APIActionException(MCPMsgBase):
         self.buf.extend(self.exception_bytes)
 
 @_register_parser
-@_set_msg_type(mcproto.API_ACTION_LOGIN_EXCEPTION)
-class APILoginFailed(APIActionException):
-    pass
-
-@_register_parser
 @_set_msg_type(mcproto.API_ACTION_LOGIN)
 class APILogin(MCPMsgBase):
-    def __init__(self, mcp_connection, api_hostname=None, session_info=None):
+    def __init__(self, mcp_connection, api_action_id=None, session_info=None, args=None, kwargs=None):
         super().__init__(mcp_connection)
-        self.api_hostname = api_hostname
+        self.api_action_id = api_action_id
         self.session_info = session_info
-        self.json_bytes = None
+        self.args = args
+        self.kwargs = kwargs
         self.len = None
         # maximum size of info: 1024 bytes
 
@@ -480,47 +477,90 @@ class APILogin(MCPMsgBase):
         msg = super(APILogin, cls).parser(
             mcp_connection, msg_type, msg_len, version, xid, buf)
 
-        (msg.len, ) = struct.unpack_from(
+        (msg.api_action_id, msg.len, ) = struct.unpack_from(
             mcproto.API_ACTION_LOGIN_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
 
         offset = mcproto.MCP_HEADER_SIZE + mcproto.API_ACTION_LOGIN_SIZE
 
-        # retrive exception byte data
-        msg.json_bytes = msg.buf[offset:]
+        # retrive byte data
+        json_bytes = msg.buf[offset:]
 
-        if msg.len < len(msg.json_bytes):
-            msg.json_bytes = msg.json_bytes[:msg.len]
+        if msg.len < len(json_bytes):
+            json_bytes = json_bytes[:msg.len]
 
         # decode json
-        data = json.loads(msg.json_bytes.decode('utf-8'))
+        data = json.loads(json_bytes.decode('utf-8'))
 
-        msg.api_hostname = data['api_hostname']
         msg.session_info = data['session_info']
+        msg.args = data['args']
+        msg.kwargs = data['kwargs']
 
         return msg
 
     def _serialize_body(self):
-        assert self.api_hostname is not None
+        assert self.api_action_id is not None
 
-        data = json.dumps({
-            'api_hostname': self.api_hostname,
-            'session_info': self.session_info
-        })
+        data_bytes = json.dumps({
+            'session_info': dataclasses.asdict(self.session_info),
+            'args': self.args,
+            'kwargs': self.kwargs
+        }).encode('utf-8')
 
-        self.excpetion_bytes = json.dumps(data).encode('utf-8')
-        self.len = len(data)
+        self.len = len(data_bytes)
 
         msg_pack_into(mcproto.API_ACTION_LOGIN_STR,
-                      self.buf, mcproto.MCP_HEADER_SIZE, self.len)
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.api_action_id, self.len)
 
-        self.buf.extend(data)
+        self.buf.extend(data_bytes)
+
+
+@_register_parser
+@_set_msg_type(mcproto.API_ACTION_LOGIN_FAILED)
+class APILoginFailed(MCPMsgBase):
+    def __init__(self, mcp_connection, exception=None):
+        super().__init__(mcp_connection)
+
+        if not isinstance(exception, Exception):
+            raise TypeError()
+
+        self.exception = exception
+        self.data_len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(APIActionException, cls).parser(
+            mcp_connection, msg_type, msg_len, version, xid, buf)
+        
+        (msg.data_len, ) = struct.unpack_from(mcproto.API_ACTION_LOGIN_FAILED_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.API_ACTION_LOGIN_FAILED_SIZE
+
+        data_bytes = msg.buf[offset:]
+
+        if msg.data_len < len(data_bytes):
+            data_bytes = data_bytes[:msg.data_len]
+
+        msg.exception = pickle.loads(data_bytes)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.exception is not None
+
+        data_bytes = pickle.dumps(self.exception)
+        self.data_len = len(data_bytes)
+
+        msg_pack_into(mcproto.API_ACTION_LOGIN_FAILED_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.data_len)
+
+        self.buf.extend(data_bytes)
 
 @_register_parser
 @_set_msg_type(mcproto.API_ACTION_LOGIN_RESPONSE)
 class APILoginResponse(MCPMsgBase):
-    def __init__(self, mcp_connection, api_hostname=None, auth=None):
+    def __init__(self, mcp_connection, api_action_id=None, auth=None):
         super().__init__(mcp_connection)
-        self.api_hostname = api_hostname
+        self.api_action_id = api_action_id
         self.auth = auth
         self.data_len = None
         # maximum size of info: 1024 bytes
@@ -530,39 +570,33 @@ class APILoginResponse(MCPMsgBase):
         msg = super(APILoginResponse, cls).parser(
             mcp_connection, msg_type, msg_len, version, xid, buf)
 
-        (msg.data_len, ) = struct.unpack_from(
+        (msg.api_action_id, msg.data_len, ) = struct.unpack_from(
             mcproto.API_ACTION_LOGIN_RESPONSE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
 
         offset = mcproto.MCP_HEADER_SIZE + mcproto.API_ACTION_LOGIN_RESPONSE_SIZE
 
-        data_bytes = msg.buf[offset:]
+        auth_bytes = msg.buf[offset:]
 
-        if msg.data_len < len(data_bytes):
-            data_bytes = data_bytes[:msg.data_len]
+        if msg.data_len < len(auth_bytes):
+            auth_bytes = auth_bytes[:msg.data_len]
 
         # decode json
-        data = json.loads(data_bytes.decode('utf-8'))
-
-        msg.api_hostname = data['api_hostname']
-        msg.auth = data['auth']
+        msg.auth = auth_bytes.decode('utf-8')
 
         return msg
 
     def _serialize_body(self):
-        assert self.api_hostname is not None
+        assert self.api_action_id is not None
+        assert isinstance(self.auth, str)
 
-        data = json.dumps({
-            'api_hostname': self.api_hostname,
-            'auth': self.auth
-        })
+        auth_bytes = self.auth.encode('utf-8')
 
-        data_bytes = json.dumps(data).encode('utf-8')
-        self.data_len = len(data_bytes)
+        self.data_len = len(auth_bytes)
 
         msg_pack_into(mcproto.API_ACTION_LOGIN_RESPONSE_STR,
-                      self.buf, mcproto.MCP_HEADER_SIZE, self.data_len)
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.api_action_id, self.data_len)
 
-        self.buf.extend(data)
+        self.buf.extend(auth_bytes)
 
 
 @_register_parser
@@ -579,9 +613,9 @@ class APIActionRequest(MCPMsgBase):
     # reverse
     int_to_method = {key:method for method, key in method_to_int.items()} 
 
-    def __init__(self, mcp_connection, hostname=None, method=None, auth=None, base_url=None, args=None, kwargs=None):
+    def __init__(self, mcp_connection, api_action_id=None, method=None, auth=None, base_url=None, args=None, kwargs=None):
         super().__init__(mcp_connection)
-        self.hostname = hostname
+        self.api_action_id = api_action_id
         self.method = method
         self.auth = auth
         self.base_url = base_url
@@ -595,7 +629,7 @@ class APIActionRequest(MCPMsgBase):
         msg = super(APIActionRequest, cls).parser(
             mcp_connection, msg_type, msg_len, version, xid, buf)
 
-        (method, msg.len, ) = struct.unpack_from(
+        (method, msg.api_action_id, msg.len, ) = struct.unpack_from(
             mcproto.API_ACTION_REQUEST_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
 
         # decode method
@@ -611,7 +645,6 @@ class APIActionRequest(MCPMsgBase):
         # decode json
         data = json.loads(json_bytes.decode('utf-8'))
 
-        msg.hostname = data['hostname']
         msg.base_url = data['base_url']
         msg.auth = data['auth']
         msg.args = data['args']
@@ -622,22 +655,20 @@ class APIActionRequest(MCPMsgBase):
     def _serialize_body(self):
         assert self.method is not None
 
-        data = {
+        data_bytes = json.dumps({
             'auth': self.auth,
-            'hostname': self.hostname,
             'base_url': self.base_url,
             'args': self.args,
             'kwargs': self.kwargs
-        }
+        }).encode('utf-8')
 
-        json_bytes = json.dumps(data).encode('utf-8')
-        self.len = len(json_bytes)
+        self.len = len(data_bytes)
 
         method = self.method_to_int[self.method]
         msg_pack_into(mcproto.API_ACTION_REQUEST_STR,
-                      self.buf, mcproto.MCP_HEADER_SIZE, method, self.len)
+                      self.buf, mcproto.MCP_HEADER_SIZE, method, self.api_action_id, self.len)
 
-        self.buf.extend(json_bytes)
+        self.buf.extend(data_bytes)
 
 @_register_parser
 @_set_msg_type(mcproto.API_ACTION_RESPONSE)
