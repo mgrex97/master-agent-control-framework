@@ -41,7 +41,6 @@ class RemoteResponse:
 
 @dataclass
 class SessionInfo():
-    api_hostname: str
     base_url: str
     login_info: dict
     auth: str = None
@@ -100,9 +99,9 @@ class APIAction:
 
     def get_session_info(self):
         info = SessionInfo(
-            self.base_url,
-            self.login_info,
-            self.auth
+            base_url=self.base_url,
+            login_info=self.login_info,
+            auth=self.auth
         )
 
         return info
