@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# python's pickle file
+*.pickle
+
 # vscode
 .vscode/
 .DS_Store
