@@ -6,7 +6,6 @@ from async_app_fw.lib.hub import TaskLoop, app_hub
 from custom_app.job_app.job_master_handler import JobMasterHandler
 from custom_app.job_app.job_util.job_class import REMOTE_MATER
 from custom_app.job_app.job_util.job_subprocess import JobCommand
-from async_util import print_loop_stack
 
 
 async def test_job(job_master_handler: JobMasterHandler):

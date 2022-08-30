@@ -1,8 +1,6 @@
-from async_util import print_loop_stack
 from async_app_fw.lib.hub import TaskLoop, app_hub
 from async_app_fw.base.app_manager import AppManager, SERVICE_BRICKS
 import logging
-from pprint import pprint as pp
 
 
 async def application_init_and_run():
@@ -19,8 +17,6 @@ async def application_init_and_run():
 
     services = []
     services.extend(app_mgr.instantiate_apps(**contexts))
-    # services.append(app_hub.spawn(
-    # print_loop_stack, loop=app_hub.loop, print_task=True))
 
     task_loop = TaskLoop(app_hub, services)
     try:
