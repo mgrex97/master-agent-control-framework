@@ -6,7 +6,7 @@ from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
 from async_app_fw.event.mcp_event import mcp_event
 from async_app_fw.event import event
-from custom_app.api_action_app.exception import AgentNotExist, AuthNotExist, CantFindAgent
+from custom_app.api_action_app.exception import AgentNotExist, CantFindAgent
 from custom_app.util.async_api_action import APIAction
 from .constant import API_ACTION_CONTROLLER_MASTER_APP_NAME as APP_NAME
 from .master_lib import event as api_event
@@ -17,6 +17,12 @@ _REQUIRED_APP = [
 
 spawn = app_hub.spawn
 LOG = logging.getLogger(f"APP service <{APP_NAME}: ")
+
+_API_ACTION_CLS = [APIAction]
+
+def register_APIAction_cls(cls):
+    _API_ACTION_CLS.append(cls)
+    return cls
 
 # Response for APIAction's remote feature.
 class APIActionMasterController(BaseApp):
@@ -33,7 +39,11 @@ class APIActionMasterController(BaseApp):
         self.xid_to_req = {}
 
         # Make APIAction competible with remote feature.
-        add_remote_feature_to_APIAction(APIAction)
+        for api_action_cls in _API_ACTION_CLS:
+            try:
+                api_action_cls.__new__ = add_remote_feature_to_APIAction
+            except Exception as e:
+                LOG.warning(traceback.format_exc())
 
     async def close(self):
         await super().close()
