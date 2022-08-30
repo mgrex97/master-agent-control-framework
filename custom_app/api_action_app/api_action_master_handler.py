@@ -10,7 +10,7 @@ from custom_app.api_action_app.exception import AgentNotExist, AuthNotExist, Can
 from custom_app.util.async_api_action import APIAction
 from .constant import API_ACTION_CONTROLLER_MASTER_APP_NAME as APP_NAME
 from .master_lib import event as api_event
-from .master_lib.util import remote_login_decorator, remote_request_decorator, api_action_init_decorator 
+from .master_lib.util import add_remote_feature_to_APIAction
 
 _REQUIRED_APP = [
     'async_app_fw.controller.mcp_controller.master_handler']
@@ -32,18 +32,8 @@ class APIActionMasterController(BaseApp):
         self.api_actions = {}
         self.xid_to_req = {}
 
-        # decorate APIAction's method(get,post...) function.
-        # For remote feature.
-        if self.APIAction_decorate_yet is False:
-            APIAction.get = remote_request_decorator(APIAction.get)
-            APIAction.post = remote_request_decorator(APIAction.post)
-            APIAction.put = remote_request_decorator(APIAction.put)
-            APIAction.delete = remote_request_decorator(APIAction.delete)
-            APIAction.patch = remote_request_decorator(APIAction.patch)
-            api_action_init_decorator(APIAction)
-            remote_login_decorator(APIAction)
-
-            self.APIAction_decorate_yet = True
+        # Make APIAction competible with remote feature.
+        add_remote_feature_to_APIAction(APIAction)
 
     async def close(self):
         await super().close()

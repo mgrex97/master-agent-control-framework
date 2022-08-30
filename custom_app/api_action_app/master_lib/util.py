@@ -25,9 +25,11 @@ def remote_request_decorator(fun):
 
     return _remote_send_request
 
+# decorate init method
 def api_action_init_decorator(cls: APIAction):
     init_method = cls.__init__
 
+    # When APIAction init register APIAction to APIActionMasterController and set default_agent.
     def __init__(self: APIAction, *args, default_agent=AGENT_LOCAL, **kwargs):
         init_method(self, *args, **kwargs)
         self.default_agent = default_agent
@@ -40,6 +42,7 @@ def api_action_init_decorator(cls: APIAction):
     cls.__init__ = __init__
     cls.set_default_agent = set_default_agent
 
+# decorate login method
 def remote_login_decorator(cls: APIAction):
     login_method = cls.login_api
 
@@ -58,3 +61,19 @@ def remote_login_decorator(cls: APIAction):
         return res
  
     cls.login_api = login_api
+
+def add_remote_feature_to_APIAction(cls: APIAction, request_method_names=('get', 'post', 'put', 'delete', 'patch')):
+    if type(cls) != type(APIAction):
+        raise TypeError("Input variable cls should be class APIAction.")
+ 
+    if getattr(cls, '_remote_feature', None) is not None:
+        raise Exception('APIAction already has remote feature.')
+
+    for name in request_method_names:
+        new_method = remote_request_decorator(getattr(APIAction, name))
+        setattr(APIAction, name, new_method)
+
+    api_action_init_decorator(APIAction)
+    remote_login_decorator(APIAction)
+
+    setattr(cls, '_remote_feature', True)
