@@ -6,10 +6,10 @@ app_manager = AppManager.get_instance()
 
 LOG = logging.getLogger("Test App Module")
 
-async def install_test_app(app_cls, name, timeout=20):
+async def install_test_app(app_cls, name, *args, timeout=20, **kwargs):
     LOG.info(f'Instantiate Test App <{name}>.')
 
-    app_instance:AsyncTestApp = app_manager.instantiate(app_cls, name, timeout=timeout)
+    app_instance:AsyncTestApp = app_manager.instantiate(app_cls, name, *args, timeout=timeout, **kwargs)
 
     LOG.info(f'Start Test App <{name}>.')
     app_instance.start()
