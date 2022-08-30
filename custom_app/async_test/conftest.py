@@ -1,10 +1,11 @@
 import asyncio
 import logging
+import traceback
 import pytest
 import pytest_asyncio
 from async_app_fw.lib.hub import app_hub, TaskLoop
-from custom_app.api_action_app.api_action_master_handler import ReqAPILoginCheck
-from custom_app.util.async_api_action import POST, SessionInfo, encrpt_password
+from custom_app.util.async_api_action import POST, APIAction, encrpt_password
+from custom_app.api_action_app.constant import AGENT_LOCAL
 from async_app_fw.base.app_manager import AppManager
 
 spawn = app_hub.spawn
@@ -45,40 +46,38 @@ async def async_app_fw():
 
     await app_mgr.close()
 
-    asyncio.all_tasks()
-
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def async_api_actions(async_app_fw):
+async def api_actions(async_app_fw):
     api_actions = {}
     tasks = []
     pw = encrpt_password('qnap1234')
 
-    async def login_api(api_hostname, session_info):
+    async def login_api(api_action: APIAction, api_hostname, agent=AGENT_LOCAL):
         try:
-            api_action = await ReqAPILoginCheck.send_request(api_hostname, session_info=session_info)
+            await api_action.login_api(agent=agent)
             api_actions[api_hostname] = api_action
+            logging.info(f"APIAction <{api_hostname}> login from agent {agent} success.")
         except Exception as e:
-            logging.warning(f"Can't login target api service {api_hostname}.")
+            logging.warning(f"Can't login target api service {api_hostname} from agetn <{agent}>.\n Traceback: {traceback.format_exc()}")
             api_actions[api_hostname] = None
 
     for i in range(1,5):
         api_hostname = f'switch{i}'
-        session_info = SessionInfo(
-            api_hostname=api_hostname,
-            base_url=f'https://10.88.0.1{i}/api/v1/', 
-            login_info={
-                'url': 'users/login',
-                'method': POST,
-                'data': {
-                    'username': 'admin',
-                    'password': pw
-                },
-                'auth_path': 'result'
-            }
-        )
+        agent = f'169.254.0.{i}'
+        base_url=f'https://10.88.0.1{i}/api/v1/' 
+        login_info={
+            'url': 'users/login',
+            'method': POST,
+            'data': {
+                'username': 'admin',
+                'password': pw
+            },
+            'auth_path': 'result'
+        }
+        api_action = APIAction(base_url, login_info=login_info)
 
         # create concurrent login task
-        tasks.append(spawn(login_api, api_hostname, session_info))        
+        tasks.append(spawn(login_api, api_action, api_hostname, agent=agent))
 
     # wait all login task end.
     await TaskLoop(app_hub, tasks).wait_tasks()

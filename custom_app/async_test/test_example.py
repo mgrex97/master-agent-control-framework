@@ -2,17 +2,20 @@ import logging
 from time import time
 import traceback
 import asyncio
-from custom_app.api_action_app.api_action_master_handler import ReqGetAPIAction
 from async_app_fw.base.app_manager import AppManager
 from custom_app.test_app.base_app import AsyncTestApp, Step
-from custom_app.util.async_api_action import POST, APIAction
+from custom_app.util.async_api_action import APIAction
 from custom_app.test_app.util import install_test_app
 
 app_manager = AppManager.get_instance()
 
 class APIActionTest(AsyncTestApp):
+    def __init__(self, test_name, api_actions, timeout=10, *_args, **_kwargs):
+        super().__init__(test_name, timeout, *_args, **_kwargs)
+        self.api_actions = api_actions
+
     async def prepare_test(self):
-        self.api_action: APIAction = await ReqGetAPIAction.send_request('switch3')
+        self.api_action:APIAction = self.api_actions['switch1']
 
     @Step('test', no_queue=True, ignore_exception=False)
     async def send_remote_request(self):
@@ -31,10 +34,10 @@ class APIActionTest(AsyncTestApp):
         self.stop_test()
 
 class TestExample:
-    async def test_case(self):
+    async def test_case(self, api_actions):
         logging.info('Start test')
 
         task = await install_test_app(
-            APIActionTest, 'test count test', timeout=20)
+            APIActionTest, 'test count test', api_actions, timeout=20)
 
         logging.info('Stop test')
