@@ -63,7 +63,7 @@ class InfoCollector(ABC):
         pass
 
     def change_interval(self, interval):
-        if interval is None or not isinstance(interval, int) or interval <= 0:
+        if interval is None or not isinstance(interval, (int, float)) or interval <= 0:
             raise GetInfoIntervalError()
  
         self._interval = interval
