@@ -5,7 +5,9 @@ import asyncio
 from async_app_fw.base.app_manager import AppManager
 from custom_app.test_app.base_app import AsyncTestApp, Step
 from custom_app.util.async_api_action import APIAction
+from custom_app.util.async_command_executor import AsyncCommandExecutor
 from custom_app.test_app.util import install_test_app
+from other_resource import other_path
 
 app_manager = AppManager.get_instance()
 
@@ -41,3 +43,39 @@ class TestExample:
             APIActionTest, 'test count test', api_actions, timeout=20)
 
         logging.info('Stop test')
+
+    async def test_async_command(self):
+        async_command = AsyncCommandExecutor(command='ping -c 3 169.254.0.1', timeout=15)
+        await async_command.start()
+
+        while async_command.is_running():
+            get = await async_command.read_stdout()
+            logging.info(get)
+
+    async def test_wrong_command(self):
+        async_command = AsyncCommandExecutor(command='ping -c 3 ', timeout=15)
+        await async_command.start()
+
+        while async_command.is_running():
+            get = await async_command.read_stdout()
+            logging.info(get)
+ 
+        async_command.result()
+
+    async def test_interaction(self):
+        async_command = AsyncCommandExecutor(command=f'sh {other_path}/interaction_test.sh', timeout=15)
+        await async_command.start()
+
+        get = await async_command.read_stdout()
+
+        logging.info(get)
+
+        assert 'Enter Your Name:' in get
+
+        await async_command.write_stdin('carltonlin\n')
+
+        get = await async_command.read_stdout(timeout=6)
+
+        logging.info(get)
+
+        assert "Welcome carltonlin!" in get
