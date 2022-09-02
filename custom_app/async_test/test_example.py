@@ -6,7 +6,6 @@ from async_app_fw.base.app_manager import AppManager
 from custom_app.test_app.base_app import AsyncTestApp, Step
 from custom_app.util.async_api_action import APIAction
 from custom_app.util.async_command_executor import AsyncCommandExecutor
-from custom_app.test_app.util import install_test_app
 from other_resource import other_path
 
 app_manager = AppManager.get_instance()
@@ -36,11 +35,19 @@ class APIActionTest(AsyncTestApp):
         self.stop_test()
 
 class TestExample:
-    async def test_case(self, api_actions):
+    async def test_api_action_remote_feature(self, api_actions):
+        api_action:APIAction = api_actions['switch1']
         logging.info('Start test')
 
-        task = await install_test_app(
-            APIActionTest, 'test count test', api_actions, timeout=20)
+        try:
+            for _ in range(3):
+                start = time()
+                resp = await api_action.get('system/info', agent='169.254.0.1', timeout=2)
+                logging.info(f'time: {time() - start}')
+                logging.info(resp.json)
+                await asyncio.sleep(2)
+        except Exception as e:
+            logging.info(traceback.format_exc())
 
         logging.info('Stop test')
 
