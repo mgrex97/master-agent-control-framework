@@ -81,9 +81,7 @@ class AsyncCommandExecutor:
         self._stop_event.clear()
         self._command_start_event.clear()
 
-        self._stdin = None
-        self._stdout = None
-        self._stderr = None
+        self._stdin = self._stdout = self._stderr = None
         self._eof_reached = False
 
     @check_running(NOT_RUNNING)
