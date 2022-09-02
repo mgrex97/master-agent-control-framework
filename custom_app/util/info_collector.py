@@ -54,9 +54,12 @@ class InfoCollector(ABC):
             await asyncio.wait(self.collect_task)
 
     async def info_collect_loop(self):
-        while True:
-            await self.get_info()
-            await asyncio.sleep(self._interval)
+        try:
+            while True:
+                await self.get_info()
+                await asyncio.sleep(self._interval)
+        except asyncio.CancelledError:
+            pass
 
     @abstractmethod
     async def get_info(self):
