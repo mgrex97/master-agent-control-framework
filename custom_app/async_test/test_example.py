@@ -42,7 +42,7 @@ class TestExample:
         try:
             for _ in range(3):
                 start = time()
-                resp = await api_action.get('system/info', agent='169.254.0.1', timeout=2)
+                resp = await api_action.get('system/info', agent='169.254.0.1', exe_timeout=2)
                 logging.info(f'time: {time() - start}')
                 logging.info(resp.json)
                 await asyncio.sleep(2)
@@ -52,25 +52,25 @@ class TestExample:
         logging.info('Stop test')
 
     async def test_async_command(self):
-        async_command = AsyncCommandExecutor(command='ping -c 3 169.254.0.1', timeout=15)
+        async_command = AsyncCommandExecutor(command='ping -c 3 169.254.0.1', exe_timeout=15)
         await async_command.start()
 
-        while async_command.is_running():
+        while await async_command.is_running():
             get = await async_command.read_stdout()
             logging.info(get)
 
     async def test_wrong_command(self):
-        async_command = AsyncCommandExecutor(command='ping -c 3 ', timeout=15)
+        async_command = AsyncCommandExecutor(command='ping -c 3 ', exe_timeout=15)
         await async_command.start()
 
-        while async_command.is_running():
+        while await async_command.is_running():
             get = await async_command.read_stdout()
             logging.info(get)
  
         async_command.result()
 
     async def test_interaction(self):
-        async_command = AsyncCommandExecutor(command=f'sh {other_path}/interaction_test.sh', timeout=15)
+        async_command = AsyncCommandExecutor(command=f'sh {other_path}/interaction_test.sh', exe_timeout=15)
         await async_command.start()
 
         get = await async_command.read_stdout()
