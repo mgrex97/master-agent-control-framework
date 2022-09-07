@@ -78,6 +78,15 @@ class AsyncCommandExecutor(AsyncUtility):
         return get
 
     @check_event(EventID.stop.value, False)
+    async def read_stderr(self, timeout=READ_TIMEOUT, read_char=None, read_until=None):
+        try:
+            get = await wait_for(self._read_std(self._stderr, read_char=read_char, read_until=read_until), timeout)
+        except asyncTimeoutError:
+            raise StdOutReadTimeout()
+
+        return get
+
+    @check_event(EventID.stop.value, False)
     async def write_stdin(self, data: str, timeout=READ_TIMEOUT):
         self._stdin.write(data.encode('utf-8'))
 
