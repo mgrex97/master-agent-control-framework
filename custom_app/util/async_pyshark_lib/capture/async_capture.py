@@ -1,10 +1,12 @@
 import asyncio
 import logging
-from time import time
 from pyshark.capture.capture import Capture, StopCapture
 
 DEFAULT_PACKET_CAPTURE_SIZE = 200
 DEFAULT_GET_PACKET_TIMEOUT = 5
+
+class AsyncCaptureStop(Exception):
+    pass
 
 class AsyncCapture(Capture):
     def __init__(self, capture_size=DEFAULT_PACKET_CAPTURE_SIZE, log=None, display_filter=None, only_summaries=False, eventloop=None, decryption_key=None, encryption_type="wpa-pwd", output_file=None, decode_as=None, disable_protocol=None, tshark_path=None, override_prefs=None, capture_filter=None, use_json=False, include_raw=False, use_ek=False, custom_parameters=None, debug=False):
@@ -31,10 +33,22 @@ class AsyncCapture(Capture):
             self._log.warning(f'Packet Queue is already full, pop out one packet from queue.')
             queue.get_nowait()
 
-        
         await queue.put(pkt)
 
+    async def get_packet(self, timeout=None):
+        timeout = timeout or DEFAULT_GET_PACKET_TIMEOUT
+        get = await asyncio.wait_for(self._packets_queue.get(), timeout)
+
+        if isinstance(get, Exception):
+            raise get
+
+        return get
+
+
     async def capture_packet(self, packet_callback=None, timeout=None, packet_count=None):
+        while not self._packets_queue.empty():
+            self._packets_queue()
+
         packet_callback = packet_callback or self.push_packet
         tshark_process = await self._get_tshark_process(packet_count=packet_count)
 
@@ -76,6 +90,8 @@ class AsyncCapture(Capture):
         return await asyncio.wait_for(self._packets_queue.get(), timeout)
 
     async def close(self):
+        self._packets_queue.put_nowait(AsyncCaptureStop())
+
         for process in self._running_processes.copy():
             await self._cleanup_subprocess(process)
         self._running_processes.clear()
