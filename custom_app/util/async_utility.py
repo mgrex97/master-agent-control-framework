@@ -69,7 +69,6 @@ class AsyncUtility(ABC):
         for event in self._events.values():
             event.clear()
 
-    @abstractmethod
     def _init_event(self, events_id):
         for event in events_id:
             event_instance = Event()
