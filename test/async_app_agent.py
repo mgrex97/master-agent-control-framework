@@ -12,7 +12,9 @@ async def application_init_and_run():
     logger = logging.getLogger(__name__)
     app_mgr = AppManager.get_instance()
     app_mgr.load_apps([
-        'async_app_fw.controller.mcp_controller.agent_handler'
+        'async_app_fw.controller.mcp_controller.agent_handler',
+        'custom_app.async_packet_capture_service.capture_service_agent_handler',
+        'custom_app.api_action_app.api_action_agent_handler'
     ])
 
     contexts = app_mgr.create_contexts()
