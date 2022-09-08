@@ -30,11 +30,12 @@ class AsyncCapture(Capture):
 
     async def push_packet(self, pkt):
         queue = self._packets_queue
-        if queue.qsize() > self._capture_size:
+
+        if queue.full():
             self._log.warning(f'Packet Queue is already full, pop out one packet from queue.')
             queue.get_nowait()
 
-        await queue.put(pkt)
+        queue.put_nowait(pkt)
 
     async def get_packet(self, timeout=None):
         timeout = timeout or DEFAULT_GET_PACKET_TIMEOUT
