@@ -86,10 +86,10 @@ class AsyncCapture(Capture):
             if packet_count and packets_captured >= packet_count:
                 break
 
-    async def get_packet(self, timeout=None):
-        return await asyncio.wait_for(self._packets_queue.get(), timeout)
-
     async def close(self):
+        if self._packets_queue.full():
+            self._packets_queue.get_nowait()
+
         self._packets_queue.put_nowait(AsyncCaptureStop())
 
         for process in self._running_processes.copy():
