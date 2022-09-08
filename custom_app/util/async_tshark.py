@@ -24,10 +24,10 @@ class AsyncCaptureService(AsyncUtility, ABC):
         return await self._capture.get_packet(timeout)
 
     def _set_init_vars(self, **kwargs):
-        self._live_capture_init_var = kwargs
+        self.capture_init_var = kwargs
 
     def update_init_vars(self, **kwargs):
-        init_var = self._live_capture_init_var
+        init_var = self.capture_init_var
 
         for name, value in kwargs.items():
             if name not in kwargs:
@@ -39,7 +39,7 @@ class AsyncCaptureService(AsyncUtility, ABC):
     async def start(self, callback=None, packet_count=None, exe_timeout=None):
         exe_timeout = exe_timeout or self._exe_timeout
         self._reset()
-        self._spwan_execute(self._live_capture_init_var ,callback, packet_count, exe_timeout)
+        self._spwan_execute(self.capture_init_var ,callback, packet_count, exe_timeout)
         await self._wait_event(EventID.start.value)
         self._check_exception()
         await self._wait_event(EventID.running.value)
@@ -92,6 +92,8 @@ class AsyncCaptureService(AsyncUtility, ABC):
         super()._reset()
 
 class AsyncLiveCaptureService(AsyncCaptureService):
+    capture_cls_id = 1
+
     def __init__(self, name='...', exe_timeout=LIVE_CAPTURE_DEFAULT_CAPTURE_TIMEOUT, capture_size=None, interface=None,
                 bpf_filter=None, display_filter=None, only_summaries=False, decryption_key=None,
                 encryption_type='wpa-pwk', output_file=None, decode_as=None, disable_protocol=None,
