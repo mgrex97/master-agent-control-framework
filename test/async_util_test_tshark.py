@@ -1,7 +1,7 @@
 from async_app_fw.lib.hub import app_hub
 from custom_app.util.async_tshark import AsyncLiveCaptureService
 from custom_app.util.async_utility import EventStateCheckFalied
-from custom_app.util.async_pyshark_lib.capture.async_capture import StopCapture
+from custom_app.util.async_pyshark_lib.capture.async_capture import AsyncCaptureStop
 
 spawn = app_hub.spawn
 
@@ -16,7 +16,7 @@ if __name__ == '__main__':
             try:
                 get = await capture.get_packet()
                 print(get)
-            except StopCapture:
+            except AsyncCaptureStop:
                 break
  
         await task
