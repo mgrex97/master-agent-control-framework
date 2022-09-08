@@ -68,6 +68,11 @@ class AsyncCaptureService(AsyncUtility, ABC):
         except Exception as e:
             self._set_exception(e)
         finally:
+            # Prevent from exception occur cause these two event not been set, make start async method stuck.
+            for event_id in (EventID.prepare.value, EventID.running.value):
+                if not self._check_event_is_set(event_id):
+                    self._set_event(event_id)
+
             self._set_event(EventID.stop.value)
 
             if isinstance(capture, _AsyncLiveCapture):
