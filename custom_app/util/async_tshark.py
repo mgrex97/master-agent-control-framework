@@ -10,14 +10,14 @@ from .constant import AsyncUtilityEventID as EventID
 
 LIVE_CAPTURE_DEFAULT_CAPTURE_TIMEOUT = 30
 
-class AsyncTsharkCapture(AsyncUtility, ABC):
+class AsyncCaptureService(AsyncUtility, ABC):
     def __init__(self, name='...', exe_timeout=LIVE_CAPTURE_DEFAULT_CAPTURE_TIMEOUT, log=None, capture_cls=None):
         if not issubclass(capture_cls, _AsyncCapture):
             raise ValueError(f'input value capture_cls should be instance of AsyncCapture.')
 
         self._capture_cls = capture_cls
         log = log or logging.getLogger(f'Async Tshark Capture <{name}')
-        super(AsyncTsharkCapture, self).__init__(log=log, exe_timeout=exe_timeout)
+        super(AsyncCaptureService, self).__init__(log=log, exe_timeout=exe_timeout)
 
     @check_event(EventID.running.value, True)
     async def get_packet(self, timeout=None):
@@ -86,7 +86,7 @@ class AsyncTsharkCapture(AsyncUtility, ABC):
     def _reset(self):
         super()._reset()
 
-class AsyncTsharkLiveCapture(AsyncTsharkCapture):
+class AsyncLiveCaptureService(AsyncCaptureService):
     def __init__(self, name='...', exe_timeout=LIVE_CAPTURE_DEFAULT_CAPTURE_TIMEOUT, interface=None,
                 bpf_filter=None, display_filter=None, only_summaries=False, decryption_key=None,
                 encryption_type='wpa-pwk', output_file=None, decode_as=None, disable_protocol=None,
@@ -95,5 +95,5 @@ class AsyncTsharkLiveCapture(AsyncTsharkCapture):
 
         log = logging.getLogger(f'Async Tshark Live Capture <{name}>')
         self._set_init_vars(interface=interface, bpf_filter=bpf_filter, display_filter=display_filter, only_summaries=only_summaries, decryption_key=decryption_key, encryption_type=encryption_type, output_file=output_file, decode_as=decode_as, disable_protocol=disable_protocol, tshark_path=tshark_path, override_prefs=override_prefs, capture_filter=capture_filter, monitor_mode=monitor_mode, use_json=use_json, use_ek=use_ek, include_raw=include_raw, eventloop=eventloop, custom_parameters=custom_parameters, debug=debug)
-        super(AsyncTsharkLiveCapture, self).__init__(log=log, exe_timeout=exe_timeout\
+        super(AsyncLiveCaptureService, self).__init__(log=log, exe_timeout=exe_timeout\
             , name=name, capture_cls=_AsyncLiveCapture)
