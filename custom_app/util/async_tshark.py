@@ -87,13 +87,13 @@ class AsyncCaptureService(AsyncUtility, ABC):
         super()._reset()
 
 class AsyncLiveCaptureService(AsyncCaptureService):
-    def __init__(self, name='...', exe_timeout=LIVE_CAPTURE_DEFAULT_CAPTURE_TIMEOUT, interface=None,
+    def __init__(self, name='...', exe_timeout=LIVE_CAPTURE_DEFAULT_CAPTURE_TIMEOUT, capture_size=None, interface=None,
                 bpf_filter=None, display_filter=None, only_summaries=False, decryption_key=None,
                 encryption_type='wpa-pwk', output_file=None, decode_as=None, disable_protocol=None,
                 tshark_path=None, override_prefs=None, capture_filter=None, monitor_mode=False, use_json=False,
                  use_ek=False, include_raw=False, eventloop=None, custom_parameters=None, debug=False):
 
         log = logging.getLogger(f'Async Tshark Live Capture <{name}>')
-        self._set_init_vars(interface=interface, bpf_filter=bpf_filter, display_filter=display_filter, only_summaries=only_summaries, decryption_key=decryption_key, encryption_type=encryption_type, output_file=output_file, decode_as=decode_as, disable_protocol=disable_protocol, tshark_path=tshark_path, override_prefs=override_prefs, capture_filter=capture_filter, monitor_mode=monitor_mode, use_json=use_json, use_ek=use_ek, include_raw=include_raw, eventloop=eventloop, custom_parameters=custom_parameters, debug=debug)
+        self._set_init_vars(capture_size=capture_size, interface=interface, bpf_filter=bpf_filter, display_filter=display_filter, only_summaries=only_summaries, decryption_key=decryption_key, encryption_type=encryption_type, output_file=output_file, decode_as=decode_as, disable_protocol=disable_protocol, tshark_path=tshark_path, override_prefs=override_prefs, capture_filter=capture_filter, monitor_mode=monitor_mode, use_json=use_json, use_ek=use_ek, include_raw=include_raw, eventloop=eventloop, custom_parameters=custom_parameters, debug=debug)
         super(AsyncLiveCaptureService, self).__init__(log=log, exe_timeout=exe_timeout\
             , name=name, capture_cls=_AsyncLiveCapture)

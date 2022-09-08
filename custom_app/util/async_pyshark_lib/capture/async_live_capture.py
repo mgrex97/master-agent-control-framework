@@ -15,7 +15,7 @@ class UnknownInterfaceException(Exception):
 class AsyncLiveCapture(AsyncCapture):
     """Represents a live capture on a network interface."""
 
-    def __init__(self, capture_size=DEFAULT_PACKET_CAPTURE_SIZE, interface=None, bpf_filter=None, display_filter=None, only_summaries=False,
+    def __init__(self, capture_size=None, interface=None, bpf_filter=None, display_filter=None, only_summaries=False,
                  decryption_key=None, encryption_type='wpa-pwk', output_file=None, decode_as=None,
                  disable_protocol=None, tshark_path=None, override_prefs=None, capture_filter=None,
                  monitor_mode=False, use_json=False, use_ek=False,

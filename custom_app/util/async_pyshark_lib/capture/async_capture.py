@@ -9,7 +9,8 @@ class AsyncCaptureStop(Exception):
     pass
 
 class AsyncCapture(Capture):
-    def __init__(self, capture_size=DEFAULT_PACKET_CAPTURE_SIZE, log=None, display_filter=None, only_summaries=False, eventloop=None, decryption_key=None, encryption_type="wpa-pwd", output_file=None, decode_as=None, disable_protocol=None, tshark_path=None, override_prefs=None, capture_filter=None, use_json=False, include_raw=False, use_ek=False, custom_parameters=None, debug=False):
+    def __init__(self, capture_size=None, log=None, display_filter=None, only_summaries=False, eventloop=None, decryption_key=None, encryption_type="wpa-pwd", output_file=None, decode_as=None, disable_protocol=None, tshark_path=None, override_prefs=None, capture_filter=None, use_json=False, include_raw=False, use_ek=False, custom_parameters=None, debug=False):
+        capture_size = capture_size or DEFAULT_PACKET_CAPTURE_SIZE
         self._log = log or logging.getLogger('Async Capture')
         super().__init__(display_filter, only_summaries, eventloop, decryption_key, encryption_type, output_file, decode_as, disable_protocol, tshark_path, override_prefs, capture_filter, use_json, include_raw, use_ek, custom_parameters, debug)
         self._capture_size = capture_size
