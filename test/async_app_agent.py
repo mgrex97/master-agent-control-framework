@@ -1,7 +1,7 @@
 
 from async_util import print_loop_stack
 from async_app_fw.lib.hub import TaskLoop, app_hub
-from async_app_fw.base.app_manager import AppManager, SERVICE_BRICKS
+from async_app_fw.base.app_manager import AppManager
 import logging
 
 

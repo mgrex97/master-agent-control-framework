@@ -58,7 +58,6 @@ class AsyncCommandExecutor(AsyncUtility):
     async def start(self, command=None, exe_timeout=None):
         command = command or self.command
         exe_timeout = exe_timeout or self._exe_timeout
-        self._reset()
         self._spwan_execute(command, exe_timeout)
 
         # wait event been set. sequence: start->prepare->running

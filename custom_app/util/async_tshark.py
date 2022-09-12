@@ -38,7 +38,6 @@ class AsyncCaptureService(AsyncUtility, ABC):
     @check_event(EventID.finish.value, True)
     async def start(self, callback=None, packet_count=None, exe_timeout=None):
         exe_timeout = exe_timeout or self._exe_timeout
-        self._reset()
         self._spwan_execute(self.capture_init_var ,callback, packet_count, exe_timeout)
         await self._wait_event(EventID.start.value)
         self._check_exception()
