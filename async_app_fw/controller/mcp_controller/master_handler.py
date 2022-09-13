@@ -11,6 +11,7 @@ from async_app_fw.controller.mcp_controller.mcp_state import \
 LOG = logging.getLogger(
     'async_app_fw.controller.mcp_controller.agent_controller')
 
+APP_NAME = 'mcp_master_handler'
 
 class MCPMasterHandler(BaseApp):
     _EVENTS = event.get_event_from_module(
@@ -18,7 +19,7 @@ class MCPMasterHandler(BaseApp):
 
     def __init__(self, *_args, **_kwargs):
         super(MCPMasterHandler, self).__init__(*_args, **_kwargs)
-        self.name = 'mcp_master_handler'
+        self.name = APP_NAME
         self.controller = None
         self.connection_dict = {}
 
