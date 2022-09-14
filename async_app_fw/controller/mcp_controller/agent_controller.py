@@ -35,12 +35,13 @@ from async_app_fw.controller.mcp_controller.mcp_controller import MachineConnect
 # from ryu import cfg
 from async_app_fw.lib import hub
 
-logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(
     'Machine Agent Controller')
 
+LOG.setLevel(logging.DEBUG)
 
 class MachineControlAgentController(object):
+    # def __init__(self, host='169.254.0.111', port=7930):
     def __init__(self, host='127.0.0.1', port=7930):
         self.host = host
         self.port = port
