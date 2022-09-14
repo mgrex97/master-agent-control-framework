@@ -138,6 +138,8 @@ class Hub():
                 self.LOG.warning('Stop Iteration.')
             except asyncio.CancelledError as e:
                 self.LOG.warning(f'Spawn task <{name}> get CancelledError.')
+            except Exception:
+                self.LOG.debug(traceback.format_exc())
             finally:
                 self.LOG.info(f'Spawn end: {name}')
 
