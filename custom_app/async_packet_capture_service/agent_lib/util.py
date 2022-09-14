@@ -1,7 +1,5 @@
-from multiprocessing import connection
 from types import MethodType
 from custom_app.util.async_tshark import AsyncCaptureService
-from async_app_fw.controller.mcp_controller.agent_controller import AgentConnection
 
 def remote_set_event(method):
     def _remote_set_event(self, event_id):

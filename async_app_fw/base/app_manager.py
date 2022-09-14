@@ -3,6 +3,7 @@ import inspect
 import itertools
 import logging
 import gc
+import traceback
 
 from async_app_fw.controller.handler import register_instance, get_dependent_services, HANDLER_FILTER, FILTER_TYPE as DEFAULT_FILTER_TYPE
 from async_app_fw.event import event
