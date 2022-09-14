@@ -879,3 +879,340 @@ class CaptureServiceSetException(MCPMsgBase):
                       self.buf, mcproto.MCP_HEADER_SIZE, self.capture_id, self.len)
 
         self.buf.extend(exception_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_EXE)
+class CmdServiceExecute(MCPMsgBase):
+    def __init__(self, mcp_connection, cmd_id=None, input_vars=None):
+        super().__init__(mcp_connection)
+        self.cmd_id = cmd_id
+        self.input_vars = input_vars
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CmdServiceExecute, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.cmd_id, msg.len, ) = struct.unpack_from(
+            mcproto.CMD_SERVICE_EXE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CMD_SERVICE_EXE_SIZE
+
+        input_vars_bytes = msg.buf[offset:]
+
+        if msg.len < len(input_vars_bytes):
+            input_vars_bytes = input_vars_bytes[:msg.len]
+
+        # decode json
+        msg.input_vars = json.loads(input_vars_bytes.decode('utf-8'))
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.cmd_id is not None
+        assert self.input_vars is not None
+
+        input_vars_bytes = json.dumps(self.input_vars).encode('utf-8')
+        self.len = len(input_vars_bytes)
+
+        msg_pack_into(mcproto.CMD_SERVICE_EXE_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.cmd_id, self.len)
+
+        self.buf.extend(input_vars_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_CANCEL_EXE)
+class CmdServiceCancelExecute(MCPMsgBase):
+    def __init__(self, connection, cmd_id=None):
+        super().__init__(connection)
+        self.cmd_id = cmd_id
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CmdServiceCancelExecute, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.cmd_id, ) = struct.unpack_from(
+            mcproto.CMD_SERVICE_CANCEL_EXECUTE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+        
+        return msg
+
+    def _serialize_body(self):
+        assert self.cmd_id is not None
+
+        msg_pack_into(mcproto.CMD_SERVICE_CANCEL_EXECUTE_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.cmd_id)
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_READ_STD)
+class CmdServiceReadStd(MCPMsgBase):
+    def __init__(self, mcp_connection, cmd_id=None, std_type=None, input_vars=None):
+        super().__init__(mcp_connection)
+        self.cmd_id = cmd_id
+        self.std_type = std_type
+        self.input_vars = input_vars
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CmdServiceReadStd, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.cmd_id, msg.std_type, msg.len, ) = struct.unpack_from(
+            mcproto.CMD_SERVICE_READ_STD_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CMD_SERVICE_READ_STD_SIZE
+
+        input_vars_bytes = msg.buf[offset:]
+
+        if msg.len < len(input_vars_bytes):
+            input_vars_bytes = input_vars_bytes[:msg.len]
+
+        # decode json
+        msg.input_vars = json.loads(input_vars_bytes.decode('utf-8'))
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.cmd_id is not None
+        assert self.input_vars is not None
+
+        input_vars_bytes = json.dumps(self.input_vars).encode('utf-8')
+        self.len = len(input_vars_bytes)
+
+        msg_pack_into(mcproto.CMD_SERVICE_READ_STD_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.cmd_id, self.std_type, self.len)
+
+        self.buf.extend(input_vars_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_WRITE_STD)
+class CmdServiceWriteStd(MCPMsgBase):
+    def __init__(self, mcp_connection, cmd_id=None, input_vars=None):
+        super().__init__(mcp_connection)
+        self.cmd_id = cmd_id
+        self.input_vars = input_vars
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CmdServiceWriteStd, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.cmd_id, msg.len, ) = struct.unpack_from(
+            mcproto.CMD_SERVICE_WRITE_STD_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CMD_SERVICE_WRITE_STD_SIZE
+
+        input_vars_bytes = msg.buf[offset:]
+
+        if msg.len < len(input_vars_bytes):
+            input_vars_bytes = input_vars_bytes[:msg.len]
+
+        # decode json
+        msg.input_vars = json.loads(input_vars_bytes.decode('utf-8'))
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.cmd_id is not None
+        assert self.input_vars is not None
+
+        input_vars_bytes = json.dumps(self.input_vars).encode('utf-8')
+        self.len = len(input_vars_bytes)
+
+        msg_pack_into(mcproto.CMD_SERVICE_WRITE_STD_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.cmd_id, self.len)
+
+        self.buf.extend(input_vars_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_READ_STD_RES)
+class CmdServiceReadStdRes(MCPMsgBase):
+    def __init__(self, mcp_connection, cmd_id=None, output=None):
+        super().__init__(mcp_connection)
+        self.cmd_id = cmd_id
+        self.output= output
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CmdServiceReadStdRes, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.cmd_id, msg.len, ) = struct.unpack_from(
+            mcproto.CMD_SERVICE_READ_STD_RES_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CMD_SERVICE_READ_STD_RES_SIZE
+
+        output_bytes = msg.buf[offset:]
+
+        if msg.len < len(output_bytes):
+            output_bytes = output_bytes[:msg.len]
+
+        msg.output = output_bytes.decode('utf-8')
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.cmd_id is not None
+        assert self.output is not None
+
+        output_bytes = self.output.encode('utf-8')
+        self.len = len(output_bytes)
+
+        msg_pack_into(mcproto.CMD_SERVICE_READ_STD_RES_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.cmd_id, self.len)
+
+        self.buf.extend(output_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_WRITE_STD_RES)
+class CmdServiceWriteStdRes(MCPMsgBase):
+    pass
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_READ_STD_EXCPTION)
+class CmdServiceReadStdException(MCPMsgBase):
+    def __init__(self, connection, cmd_id=None, exception=None):
+        super().__init__(connection)
+        self.cmd_id = cmd_id
+        self.exception = exception
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CmdServiceReadStdException, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.cmd_id, msg.len) = struct.unpack_from(
+            mcproto.CMD_SERVICE_READ_STD_EXCEPTION_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+        
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CMD_SERVICE_READ_STD_EXCEPTION_SIZE
+
+        exception_bytes = msg.buf[offset:]
+
+        if msg.len < len(exception_bytes):
+            exception_bytes = exception_bytes[:msg.len]
+
+        msg.exception = pickle.loads(exception_bytes)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.cmd_id is not None
+        assert isinstance(self.exception, Exception)
+
+        exception_bytes = pickle.dumps(self.exception)
+        self.len = len(exception_bytes)
+
+        msg_pack_into(mcproto.CMD_SERVICE_READ_STD_EXCEPTION_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.cmd_id, self.len)
+
+        self.buf.extend(exception_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_WRITE_STD_EXCPTION)
+class CmdServiceWriteStdException(MCPMsgBase):
+    def __init__(self, connection, cmd_id=None, exception=None):
+        super().__init__(connection)
+        self.cmd_id = cmd_id
+        self.exception = exception
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CmdServiceWriteStdException, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.cmd_id, msg.len) = struct.unpack_from(
+            mcproto.CMD_SERVICE_WRITE_STD_EXCEPTION_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+        
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CMD_SERVICE_WRITE_STD_EXCEPTION_SIZE
+
+        exception_bytes = msg.buf[offset:]
+
+        if msg.len < len(exception_bytes):
+            exception_bytes = exception_bytes[:msg.len]
+
+        msg.exception = pickle.loads(exception_bytes)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.cmd_id is not None
+        assert isinstance(self.exception, Exception)
+
+        exception_bytes = pickle.dumps(self.exception)
+        self.len = len(exception_bytes)
+
+        msg_pack_into(mcproto.CMD_SERVICE_WRITE_STD_EXCEPTION_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.cmd_id, self.len)
+
+        self.buf.extend(exception_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_SET_EVENT)
+class CmdServiceSetEvent(MCPMsgBase):
+    def __init__(self, connection, cmd_id=None, event_id=None):
+        super().__init__(connection)
+        self.cmd_id = cmd_id
+        self.event_id = event_id
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CmdServiceSetEvent, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.cmd_id, msg.event_id) = struct.unpack_from(
+            mcproto.CMD_SERVICE_SET_EVENT_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+ 
+        return msg
+
+    def _serialize_body(self):
+        assert self.cmd_id is not None
+        assert self.event_id is not None
+
+        msg_pack_into(mcproto.CMD_SERVICE_SET_EVENT_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.cmd_id, self.event_id)
+
+@_register_parser
+@_set_msg_type(mcproto.CMD_SERVICE_SET_EXCEPTION)
+class CmdServiceSetException(MCPMsgBase):
+    def __init__(self, connection, cmd_id=None, exception=None):
+        super().__init__(connection)
+        self.cmd_id = cmd_id
+        self.exception = exception
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CmdServiceSetException, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.cmd_id, msg.len) = struct.unpack_from(
+            mcproto.CMD_SERVICE_SET_EXCEPTION_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+        
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CMD_SERVICE_SET_EXCEPTION_SIZE
+
+        exception_bytes = msg.buf[offset:]
+
+        if msg.len < len(exception_bytes):
+            exception_bytes = exception_bytes[:msg.len]
+
+        msg.exception = pickle.loads(exception_bytes)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.cmd_id is not None
+        assert isinstance(self.exception, Exception)
+
+        exception_bytes = pickle.dumps(self.exception)
+        self.len = len(exception_bytes)
+
+        msg_pack_into(mcproto.CMD_SERVICE_SET_EXCEPTION_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.cmd_id, self.len)
+
+        self.buf.extend(exception_bytes)
