@@ -30,14 +30,13 @@ class CaptureServiceMasterHandler(BaseApp):
         self.agent_connection: Dict[str, MasterConnection] = {} 
         self.capture_services: Dict[int, AsyncCaptureService] = {}
 
-        if not getattr(AsyncCaptureService, '_remote_feature', None):
-            # AsyncCaptureService.__new__ = new_with_remote_feature
-            setattr(AsyncCaptureService, '_remote_feature', True)
-
     def start(self):
         task = super().start()
         monitor_task = spawn(self.service_close_monitor)
-        AsyncCaptureService.__new__ = remote_feature_newer(self)
+ 
+        if not getattr(AsyncCaptureService, '_remote_feature_apply', None):
+            AsyncCaptureService.__new__ = remote_feature_newer(self)
+            setattr(AsyncCaptureService, '_remote_feature_apply', True)
 
         return [task, monitor_task]
 
