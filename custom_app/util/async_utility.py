@@ -80,7 +80,6 @@ class AsyncUtility(ABC):
         pass
 
     def _spwan_execute(self, *args ,**kwargs):
-        self._reset()
         self._execute_task = spawn(self._execute, *args, **kwargs)
 
     def _cancel_execute(self):

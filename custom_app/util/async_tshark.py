@@ -1,5 +1,6 @@
 from abc import ABC
 import logging
+import pprint
 from asyncio import CancelledError, TimeoutError as asyncTimeoutError
 
 
@@ -37,8 +38,10 @@ class AsyncCaptureService(AsyncUtility, ABC):
 
     @check_event(EventID.finish.value, True)
     async def start(self, callback=None, packet_count=None, exe_timeout=None):
+        self._reset()
         exe_timeout = exe_timeout or self._exe_timeout
-        self._spwan_execute(self.capture_init_var ,callback, packet_count, exe_timeout)
+        self._log.debug(f"Timeout: {exe_timeout}, PacketCount: {packet_count}, Catpure variable: {pprint.pformat(self.capture_init_var)}")
+        self._spwan_execute(init_var=self.capture_init_var ,callback=callback, packet_count=packet_count, exe_timeout=exe_timeout)
         await self._wait_event(EventID.start.value)
         self._check_exception()
         await self._wait_event(EventID.running.value)
@@ -48,7 +51,7 @@ class AsyncCaptureService(AsyncUtility, ABC):
         capture = self._capture_cls(**init_var)
         return capture
 
-    async def _execute(self, init_var, callback, packet_count, exe_timeout):
+    async def _execute(self, init_var=None, callback=None, packet_count=None, exe_timeout=None):
         self._set_event(EventID.start.value)
         capture = None
         self._log.info('Async Live Capture Execute.')
