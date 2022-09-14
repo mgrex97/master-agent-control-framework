@@ -1,4 +1,3 @@
-
 from async_util import print_loop_stack
 from async_app_fw.lib.hub import TaskLoop, app_hub
 from async_app_fw.base.app_manager import AppManager
@@ -14,7 +13,8 @@ async def application_init_and_run():
     app_mgr.load_apps([
         'async_app_fw.controller.mcp_controller.agent_handler',
         'custom_app.async_packet_capture_service.capture_service_agent_handler',
-        'custom_app.api_action_app.api_action_agent_handler'
+        'custom_app.api_action_app.api_action_agent_handler',
+        'custom_app.async_command_executor_remote_app.command_executor_agent_handler'
     ])
 
     contexts = app_mgr.create_contexts()
