@@ -297,7 +297,12 @@ class AppManager(object):
         self.contexts = {}
 
     def load_app(self, name):
-        mod = utils.import_module(name)
+        try:
+            mod = utils.import_module(name)
+        except Exception as e:
+            LOG.error(f"Error occur when import app module {name}.\n{traceback.format_exc()}")
+            raise e
+
         clses = inspect.getmembers(mod,
                                    lambda cls: (inspect.isclass(cls) and
                                                 issubclass(cls, BaseApp) and
