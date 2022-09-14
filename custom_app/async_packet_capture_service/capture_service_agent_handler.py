@@ -73,7 +73,7 @@ class CaptureServiceAgentHandler(BaseApp):
         msg = ev.msg
         capture_id = msg.capture_id
 
-        if (capture := self.service.get(capture_id, None)) is not None:
+        if (capture := self.service.get(capture_id, None)) is None:
             # service not found.
             return
 
