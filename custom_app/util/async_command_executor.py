@@ -44,7 +44,7 @@ NOT_RUNNING = False
 IS_RUNNING = True
 
 class AsyncCommandExecutor(AsyncUtility):
-    def __init__(self, command ,name='...', exe_timeout=DEFAULT_STOP_TIMEOUT):
+    def __init__(self, command=None ,name='...', exe_timeout=DEFAULT_STOP_TIMEOUT):
         log = logging.getLogger(f'Async Command Executor <{name}>')
         super().__init__(log=log, exe_timeout=exe_timeout)
         self.command = command
@@ -56,6 +56,7 @@ class AsyncCommandExecutor(AsyncUtility):
 
     @check_event(EventID.finish.value, True)
     async def start(self, command=None, exe_timeout=None):
+        self._reset()
         command = command or self.command
         exe_timeout = exe_timeout or self._exe_timeout
         self._spwan_execute(command, exe_timeout)
