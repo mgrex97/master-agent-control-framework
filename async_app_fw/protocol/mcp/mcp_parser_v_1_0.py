@@ -708,3 +708,174 @@ class APIActionResponse(MCPMsgBase):
                       self.buf, mcproto.MCP_HEADER_SIZE, self.len)
 
         self.buf.extend(resp_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CAPTURE_SERVICE_EXE)
+class CaptureServiceExe(MCPMsgBase):
+    def __init__(self, mcp_connection, capture_id=None, capture_service_cls_id=None, input_vars=None):
+        super().__init__(mcp_connection)
+        self.capture_id = capture_id
+        self.capture_service_cls_id = capture_service_cls_id
+        self.input_vars = input_vars
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CaptureServiceExe, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.capture_id, msg.capture_service_cls_id, msg.len, ) = struct.unpack_from(
+            mcproto.CAPTURE_SERVICE_EXE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CAPTURE_SERVICE_EXE_SIZE
+
+        input_vars_bytes = msg.buf[offset:]
+
+        if msg.len < len(input_vars_bytes):
+            input_vars_bytes = input_vars_bytes[:msg.len]
+
+        # decode json
+        msg.input_vars = json.loads(input_vars_bytes.decode('utf-8'))
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.capture_id is not None
+        assert self.capture_service_cls_id is not None
+        assert self.input_vars is not None
+
+        input_vars_bytes = json.dumps(self.input_vars).encode('utf-8')
+        self.len = len(input_vars_bytes)
+
+        msg_pack_into(mcproto.CAPTURE_SERVICE_EXE_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.capture_id, self.capture_service_cls_id, self.len)
+
+        self.buf.extend(input_vars_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CAPTURE_SERVICE_SEND_PKT)
+class CaptureServiceSendPKT(MCPMsgBase):
+    def __init__(self, mcp_connection, capture_id=None, pkt=None):
+        super().__init__(mcp_connection)
+        self.capture_id = capture_id
+        self.pkt = pkt
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CaptureServiceSendPKT, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.capture_id, msg.len, ) = struct.unpack_from(
+            mcproto.CAPTURE_SERVICE_SEND_PKT_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CAPTURE_SERVICE_SEND_PKT_SIZE
+
+        pkt_bytes = msg.buf[offset:]
+
+        if msg.len < len(pkt_bytes):
+            pkt_bytes = pkt_bytes[:msg.len]
+
+        msg.pkt = pickle.loads(pkt_bytes)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.capture_id is not None
+        assert self.pkt is not None
+
+        pkt_bytes = pickle.dumps(self.pkt)
+        self.len = len(pkt_bytes)
+
+        msg_pack_into(mcproto.CAPTURE_SERVICE_SEND_PKT_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.capture_id, self.len)
+
+        self.buf.extend(pkt_bytes)
+
+@_register_parser
+@_set_msg_type(mcproto.CAPTURE_SERVICE_CANCEL_EXECUTE)
+class CaptureServiceCancelExecute(MCPMsgBase):
+    def __init__(self, connection, capture_id=None):
+        super().__init__(connection)
+        self.capture_id = capture_id
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CaptureServiceCancelExecute, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.capture_id, ) = struct.unpack_from(
+            mcproto.CAPTURE_SERVICE_CANCEL_EXECUTE_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+        
+        return msg
+
+    def _serialize_body(self):
+        assert self.capture_id is not None
+
+        msg_pack_into(mcproto.CAPTURE_SERVICE_CANCEL_EXECUTE_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.capture_id)
+
+@_register_parser
+@_set_msg_type(mcproto.CAPTURE_SERVICE_SET_EVENT)
+class CaptureServiceSetEvent(MCPMsgBase):
+    def __init__(self, connection, capture_id=None, event_id=None):
+        super().__init__(connection)
+        self.capture_id = capture_id
+        self.event_id = event_id
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CaptureServiceSetEvent, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.capture_id, msg.event_id) = struct.unpack_from(
+            mcproto.CAPTURE_SERVICE_SET_EVENT_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+ 
+        return msg
+
+    def _serialize_body(self):
+        assert self.capture_id is not None
+        assert self.event_id is not None
+
+        msg_pack_into(mcproto.CAPTURE_SERVICE_SET_EVENT_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.capture_id, self.event_id)
+
+@_register_parser
+@_set_msg_type(mcproto.CAPTURE_SERVICE_SET_EXCEPTION)
+class CaptureServiceSetException(MCPMsgBase):
+    def __init__(self, connection, capture_id=None, exception=None):
+        super().__init__(connection)
+        self.capture_id = capture_id
+        self.exception = exception
+        self.len = None
+
+    @classmethod
+    def parser(cls, mcp_connection, msg_type, msg_len, version, xid, buf):
+        msg = super(CaptureServiceSetException, cls).parser(
+        mcp_connection, msg_type, msg_len, version, xid, buf)
+
+        (msg.capture_id, msg.len) = struct.unpack_from(
+            mcproto.CAPTURE_SERVICE_SET_EXCEPTION_STR, msg.buf, mcproto.MCP_HEADER_SIZE)
+        
+        offset = mcproto.MCP_HEADER_SIZE + mcproto.CAPTURE_SERVICE_SET_EXCEPTION_SIZE
+
+        exception_bytes = msg.buf[offset:]
+
+        if msg.len < len(exception_bytes):
+            exception_bytes = exception_bytes[:msg.len]
+
+        msg.exception = pickle.loads(exception_bytes)
+
+        return msg
+
+    def _serialize_body(self):
+        assert self.capture_id is not None
+        assert isinstance(self.exception, Exception)
+
+        exception_bytes = pickle.dumps(self.exception)
+        self.len = len(exception_bytes)
+
+        msg_pack_into(mcproto.CAPTURE_SERVICE_SET_EXCEPTION_STR,
+                      self.buf, mcproto.MCP_HEADER_SIZE, self.capture_id, self.len)
+
+        self.buf.extend(exception_bytes)
