@@ -21,7 +21,6 @@ spawn = app_hub.spawn
 
 class CaptureServiceMasterHandler(BaseApp):
     CaptureService_ID = 0
-    _EVENTS = [EventRemoteExecute, EventRemoteExecute]
 
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)

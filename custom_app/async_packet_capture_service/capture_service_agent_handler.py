@@ -5,7 +5,6 @@ from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.agent_controller import AgentConnection
 from async_app_fw.controller.mcp_controller.mcp_state import MC_STABLE
-from async_app_fw.event.event import get_event_from_module
 from async_app_fw.event.mcp_event import mcp_event
 from custom_app.async_packet_capture_service.agent_lib.util import add_remote_feature
 from custom_app.util.async_tshark import AsyncCaptureService
