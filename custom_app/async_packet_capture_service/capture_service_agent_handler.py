@@ -4,7 +4,7 @@ from typing import Dict
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.controller.handler import observe_event
 from async_app_fw.controller.mcp_controller.agent_controller import AgentConnection
-from async_app_fw.controller.mcp_controller.mcp_state import MC_STABLE
+from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
 from async_app_fw.event.mcp_event import mcp_event
 from custom_app.async_packet_capture_service.agent_lib.util import add_remote_feature
 from custom_app.util.async_tshark import AsyncCaptureService
@@ -30,7 +30,7 @@ class CaptureServiceAgentHandler(BaseApp):
     def connection_handler(self, ev):
         self.master_connection = ev.connection
 
-    @observe_event(mcp_event.EventMCPStateChange, MC_STABLE)
+    @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
     def disconnection_handler(self, ev):
         # cleanup service and service_tasks that was saved before.
         for service_task in self.service_tasks.values():
