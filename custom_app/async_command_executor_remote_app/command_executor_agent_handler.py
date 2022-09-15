@@ -3,7 +3,7 @@ from typing import Dict
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.lib.hub import app_hub
 from async_app_fw.controller.handler import observe_event
-from async_app_fw.controller.mcp_controller.mcp_state import MC_STABLE
+from async_app_fw.controller.mcp_controller.mcp_state import MC_DISCONNECT, MC_STABLE
 from async_app_fw.event.mcp_event import mcp_event
 from custom_app.async_command_executor_remote_app.agent_lib.util import add_remote_feature
 from .constant import COMMAND_EXECUTOR_AGENT_HANDLER_APP_NAME as APP_NAME
@@ -31,9 +31,15 @@ class CommandExecutorAgentHandler(BaseApp):
     def connection_handler(self, ev):
         self.master_connection = ev.connection
 
-    @observe_event(mcp_event.EventMCPStateChange, MC_STABLE)
-    def connection_handler(self, ev):
-        self.master_connection = ev.connection
+
+    @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
+    def disconnection_handler(self, ev):
+        for task in self.executors_tasks.values():
+            task.cancel()
+
+        self.executors.clear()
+        self.executors_tasks.clear()
+        self.master_connection = None
 
     async def read_std(self, executor:AsyncCommandExecutor, std_type, args, kwargs, xid):
         connection = self.master_connection
