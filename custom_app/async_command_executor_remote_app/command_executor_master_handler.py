@@ -1,4 +1,3 @@
-import traceback
 from typing import Dict
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.event.mcp_event import mcp_event
@@ -91,10 +90,6 @@ class CommandExecutorMasterHandler(BaseApp):
         cmd_exe = ev.cmd_exe
         conn:MasterConnection = cmd_exe._mcp_connection
         msg = conn.mcproto_parser.CmdServiceReadStd(conn, cmd_exe._cmd_id, ev.std_type, ev.input_vars)
-        try:
-            msg.serialize()
-        except Exception:
-            print(traceback.format_exc())
         xid = conn.set_xid(msg)
         conn.send_msg(msg)
         # register Async Event Request
@@ -112,11 +107,12 @@ class CommandExecutorMasterHandler(BaseApp):
 
     @observe_event(mcp_event.EventCmdServiceWriteStdException)
     @observe_event(mcp_event.EventCmdServiceReadStdException)
-    def read_stdout_result_handler(self, ev):
-        if (req := self.req_tmp_pool.get(ev.msg.xid, None)) is None:
+    def read_stdout_exception_handler(self, ev):
+        msg = ev.msg
+        if (req := self.req_tmp_pool.get(msg.xid, None)) is None:
             return
 
-        req.push_reply(ev.exception)
+        req.push_reply(msg.exception)
 
     @observe_event(mcp_event.EventCmdServiceReadStdRes)
     @observe_event(mcp_event.EventCmdServiceWriteStdRes)
