@@ -131,14 +131,14 @@ class AsyncCommandExecutor(AsyncUtility):
             self._set_event(EventID.start.value)
             process = await self._prepare_subprocess(command)
             self._set_event(EventID.prepare.value)
-            self._log.info(f'Command {self.command} is running now.')
+            self._log.info(f'Command {command} is running now.')
             self._set_event(EventID.running.value)
             await wait_for(process.wait(), exe_timeout)
         except asyncTimeoutError:
             pass
         except CancelledError:
             # ignore CancelledError
-            self._log.info(f'Command {self.command} execute timeout.')
+            self._log.info(f'Command {command} execute timeout.')
         except CommandCrash as e:
             self._set_exception(e)
         except Exception as e:
@@ -157,7 +157,7 @@ class AsyncCommandExecutor(AsyncUtility):
                     self._log.warning('cleanup StreamWriter and StreamReader falied.')
 
         self._set_event(EventID.finish.value)
-        self._log.info(f'Command {self.command} running end.')
+        self._log.info(f'Command {command} running end.')
 
     async def _cleanup_subprocess(self, process: subprocess.Process, command):
         """Kill the given process and properly closes any pipes connected to it."""
