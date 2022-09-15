@@ -14,6 +14,9 @@ spawn = app_hub.spawn
 _REQUIRED_APP = [
     'async_app_fw.controller.mcp_controller.agent_handler']
 
+class CommandServiceNotExisted(Exception):
+    pass
+
 class CommandExecutorAgentHandler(BaseApp):
     def __init__(self, *_args, **_kwargs):
         super().__init__(*_args, **_kwargs)
@@ -34,16 +37,27 @@ class CommandExecutorAgentHandler(BaseApp):
 
     async def read_std(self, executor:AsyncCommandExecutor, std_type, args, kwargs, xid):
         connection = self.master_connection
-        output = await executor.read_std(*args, std_type=std_type, **kwargs)
-        msg = connection.mcproto_parser.CmdServiceReadStdRes(connection, executor._cmd_id, output)
-        msg.xid = xid
-        connection.send_msg(msg)
+        try:
+            output = await executor.read_std(*args, std_type=std_type, **kwargs)
+            msg = connection.mcproto_parser.CmdServiceReadStdRes(connection, executor._cmd_id, output)
+            msg.xid = xid
+            connection.send_msg(msg)
+        except Exception as e:
+            if executor._cmd_id in self.executors:
+                msg = connection.mcproto_parser.CmdServiceReadStdException(connection, executor._cmd_id, e)
+                msg.xid = xid
+                connection.send_msg(msg)
+                return
+
 
     @observe_event(mcp_event.EventCmdServiceReadStd)
     def read_stdout_handler(self, ev):
         msg = ev.msg
 
         if (executor := self.executors.get(msg.cmd_id, None)) is None:
+            exception = CommandServiceNotExisted(f'Service ID {msg.cmd_id}')
+            conn = self.master_connection
+            msg = conn.mcproto_parser.CmdServiceReadStdException(conn, msg.cmd_id, exception)
             return
 
         input_vars = msg.input_vars
