@@ -36,26 +36,31 @@ class MCPMasterHandler(BaseApp):
     async def close(self):
         await super().close()
 
-        for _, connection in self.connection_dict.items():
-            # connection.set_state(MC_DISCONNECT)
-            await connection.stop_serve()
-
-        del self.connection_dict
+        # cleanup controller and connection_dict
+        connection_dict = self.connection_dict
+        controller = self.controller
+        self.controller = None
         self.connection_dict = {}
 
-        if  self.controller is not None \
-            and isinstance(self.controller, MachineControlMasterController):
+        # stop master controller first
+        if  controller is not None \
+            and isinstance(controller, MachineControlMasterController):
+            LOG.info(f'stop controller')
+            await controller.stop()
+            LOG.info(f'stop controller end')
+            del controller
 
-            await self.controller.stop()
-            del self.controller
-            self.controller = None
+        # make sure connection serve stop
+        if len(connection_dict) > 0:
+            for _, connection in connection_dict.items():
+                connection.set_state(MC_DISCONNECT)
+                await connection.stop_serve()
+                del connection
 
     @observe_event(mcp_event.EventMCPStateChange, MC_DISCONNECT)
     def disconnecting_handler(self, ev: event.EventSocketConnecting):
         conn = ev.connection
         ip = conn.address[0]
-
-        LOG.info(f'Connection from agent <{ip}> is disconnecting.')
 
         if conn.id in self.connection_dict:
             self.connection_dict.pop(conn.id)
