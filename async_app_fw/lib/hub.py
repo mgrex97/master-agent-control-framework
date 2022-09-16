@@ -6,7 +6,6 @@ import socket
 import threading
 import traceback
 from async_app_fw.lib import ip
-from signal import SIGINT
 from async_app_fw.utils import _listify
 
 
