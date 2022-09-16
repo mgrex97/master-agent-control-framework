@@ -31,13 +31,12 @@ class CaptureServiceMasterHandler(BaseApp):
 
     def start(self):
         task = super().start()
-        monitor_task = spawn(self.service_close_monitor)
  
         if not getattr(AsyncCaptureService, '_remote_feature_apply', None):
             AsyncCaptureService.__new__ = remote_feature_newer(self)
             setattr(AsyncCaptureService, '_remote_feature_apply', True)
 
-        return [task, monitor_task]
+        return task
 
     async def close(self):
         pass
@@ -47,12 +46,6 @@ class CaptureServiceMasterHandler(BaseApp):
         id = cls.CaptureService_ID
         cls.CaptureService_ID = id + 1
         return id
-
-    async def service_close_monitor(self):
-        while True:
-            await asyncio.sleep(SERVICE_CLOSE_MONITER_INTERVAL)
-            for id, service in self.capture_services.items():
-                pass
 
     def register_capture(self, capture_instance):
         capture_id = self.get_new_capture_id()
