@@ -94,8 +94,8 @@ class Hub():
         self.loop = asyncio.new_event_loop()
         self.update_thread()
         self.setup_eventloop()
-        self.loop.add_signal_handler(
-            SIGINT, Hub.sigtstp_handler, SIGINT, self.loop)
+        # self.loop.add_signal_handler(
+        # SIGINT, Hub.sigtstp_handler, SIGINT, self.loop)
 
     def _signal_handler(self):
         pass
