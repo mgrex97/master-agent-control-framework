@@ -489,6 +489,7 @@ class AppManager(object):
         for app_name in list(self.applications.keys()):
             uninstantiate_tasks.append(self.uninstantiate(app_name))
 
-        await TaskLoop(app_hub, uninstantiate_tasks).wait_tasks()
+        await asyncio.wait(uninstantiate_tasks)
         assert not self.applications
-        await close_all(self.contexts)
+        # await close_all(self.contexts)
+        self.contexts.clear()

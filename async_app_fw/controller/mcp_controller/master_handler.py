@@ -45,9 +45,7 @@ class MCPMasterHandler(BaseApp):
         # stop master controller first
         if  controller is not None \
             and isinstance(controller, MachineControlMasterController):
-            LOG.info(f'stop controller')
             await controller.stop()
-            LOG.info(f'stop controller end')
             del controller
 
         # make sure connection serve stop
