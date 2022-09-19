@@ -131,3 +131,7 @@ class AsyncUtility(ABC):
     async def is_running(self):
         return self._check_event_is_set(AsyncUtilityEventID.running.value) and \
             not self._check_event_is_set(AsyncUtilityEventID.stop.value)
+
+    def is_running_no_await(self):
+        return self._check_event_is_set(AsyncUtilityEventID.running.value) and \
+            not self._check_event_is_set(AsyncUtilityEventID.stop.value)
