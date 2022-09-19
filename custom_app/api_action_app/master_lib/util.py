@@ -60,6 +60,7 @@ def add_remote_feature_to_APIAction(cls: APIAction, *args, **kwargs):
     def set_default_agent(self, default_agent):
         self.default_agent = default_agent
 
+    instance.default_agent = AGENT_LOCAL
     instance.set_default_agent = MethodType(set_default_agent, instance)
 
     api_action_controller = lookup_service_brick(APP_NAME)
