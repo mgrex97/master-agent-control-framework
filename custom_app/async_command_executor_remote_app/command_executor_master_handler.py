@@ -29,7 +29,7 @@ class CommandExecutorMasterHandler(BaseApp):
 
         if not getattr(AsyncCommandExecutor, '_remote_feautre_apply', None):
             AsyncCommandExecutor.__new__ = remote_feature_newer(self)
-            setattr(AsyncCaptureService, '_remote_feature_apply', True)
+            setattr(AsyncCommandExecutor, '_remote_feature_apply', True)
         
         return tasks
 
