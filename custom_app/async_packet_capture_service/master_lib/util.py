@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 from types import MethodType
 from async_app_fw.controller.mcp_controller.master_lib.event import ReqGetAgentConnection
@@ -13,8 +14,9 @@ from .event import EventRemoteExecute, EventRemoteCancelExecute
 spawn = app_hub.spawn
 
 class FakeCapture:
-    def __init__(self, capture_size) -> None:
+    def __init__(self, capture_size, callback=None) -> None:
         self._packets_queue = asyncio.Queue(capture_size)
+        self.callback = callback
 
     def change_capture_size(self, capture_size):
         if capture_size == self._packets_queue.maxsize:
@@ -32,7 +34,17 @@ class FakeCapture:
             logging.warning(f'Packet Queue is already full, pop out one packet from queue.')
             queue.get_nowait()
 
-        queue.put_nowait(pkt)
+        if self.callback is None:
+            queue.put_nowait(pkt)
+        else:
+            spawn(self.callback, pkt)
+
+    def set_callback(self, callback):
+        if not (callable(self.callback) or callback is None \
+            or inspect.isfunction(callback) or inspect.ismethod(callback)):
+            raise Exception(f"Input value callback should be callable or None.")
+
+        self.callback = callback
 
     def reset_queue(self):
         queue = self._packets_queue
@@ -55,8 +67,12 @@ class FakeCapture:
 async def remote_execute(app: BaseApp, capture: AsyncCaptureService, args, kwargs):
     # prepare fake capture.
     capture_size = kwargs['init_var']['capture_size'] or DEFAULT_PACKET_CAPTURE_SIZE
+    if (callback := kwargs['callback']) is not None:
+        kwargs['callback'] = None
+
     fake_capture:FakeCapture = capture._fake_capture
     fake_capture.change_capture_size(capture_size)
+    fake_capture.set_callback(callback)
     fake_capture.reset_queue()
     capture._capture = fake_capture
 

@@ -9,7 +9,7 @@ spawn = app_hub.spawn
 
 async def run_capture():
     await asyncio.sleep(5)
-    capture = AsyncLiveCaptureService(name='tshark test', exe_timeout=15, interface='en6', bpf_filter='icmp')
+    capture = AsyncLiveCaptureService(name='tshark test', exe_timeout=15, interface='eth6', bpf_filter='icmp')
 
     print('start capture')
 
