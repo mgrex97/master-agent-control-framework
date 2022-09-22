@@ -1,9 +1,9 @@
 from asyncio import wait_for, CancelledError, TimeoutError as asyncTimeoutError\
     , StreamReader, StreamWriter, create_subprocess_shell, subprocess
 import logging
-from custom_app.util.async_utility import AsyncUtility, check_event
+from custom_app.util.async_utility import AsyncService, check_event
 from async_app_fw.lib.hub import app_hub
-from .constant import AsyncUtilityEventID as EventID
+from .constant import AsyncServiceEventID as EventID
 
 spawn = app_hub.spawn
 
@@ -43,7 +43,7 @@ WRITE_TIMEOUT = 10
 NOT_RUNNING = False
 IS_RUNNING = True
 
-class AsyncCommandExecutor(AsyncUtility):
+class AsyncCommandExecutor(AsyncService):
     def __init__(self, command=None ,name='...', exe_timeout=DEFAULT_STOP_TIMEOUT):
         log = logging.getLogger(f'Async Command Executor <{name}>')
         super().__init__(log=log, exe_timeout=exe_timeout)

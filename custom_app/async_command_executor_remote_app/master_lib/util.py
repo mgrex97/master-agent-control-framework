@@ -5,7 +5,7 @@ from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.lib.hub import app_hub
 from ..constant import STDERR_ID, STDOUT_ID
 from custom_app.util.async_command_executor import AsyncCommandExecutor
-from custom_app.util.constant import AsyncUtilityEventID
+from custom_app.util.constant import AsyncServiceEventID
 from .event import EventRemoteExecute, EventRemoteCancelExecute, ReqReadStd
 
 
@@ -13,7 +13,7 @@ spawn = app_hub.spawn
 
 async def remote_execute(app: BaseApp, cmd_service: AsyncCommandExecutor, args, kwargs):
     app.send_event_to_self(EventRemoteExecute(cmd_service, args, kwargs))
-    await cmd_service._wait_event(AsyncUtilityEventID.stop.value, timeout=None)
+    await cmd_service._wait_event(AsyncServiceEventID.stop.value, timeout=None)
 
     # clean _mcp_connection.
     cmd_service._mcp_connection = None

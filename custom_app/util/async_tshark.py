@@ -6,12 +6,12 @@ from asyncio import CancelledError, TimeoutError as asyncTimeoutError
 
 from .async_pyshark_lib.capture.async_live_capture import AsyncLiveCapture as _AsyncLiveCapture
 from .async_pyshark_lib.capture.async_capture import AsyncCapture as _AsyncCapture
-from .async_utility import AsyncUtility, check_event
-from .constant import AsyncUtilityEventID as EventID
+from .async_utility import AsyncService, check_event
+from .constant import AsyncServiceEventID as EventID
 
 LIVE_CAPTURE_DEFAULT_CAPTURE_TIMEOUT = 30
 
-class AsyncCaptureService(AsyncUtility, ABC):
+class AsyncCaptureService(AsyncService, ABC):
     def __init__(self, name='...', exe_timeout=LIVE_CAPTURE_DEFAULT_CAPTURE_TIMEOUT, log=None, capture_cls=None):
         if not issubclass(capture_cls, _AsyncCapture):
             raise ValueError(f'input value capture_cls should be instance of AsyncCapture.')

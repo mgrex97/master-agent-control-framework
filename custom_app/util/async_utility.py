@@ -5,14 +5,14 @@ import asyncio
 from asyncio import Event
 
 from async_app_fw.lib.hub import app_hub
-from .constant import AsyncUtilityEventID, EVENT_NAMES_MAPPING
+from .constant import AsyncServiceEventID, EVENT_NAMES_MAPPING
 
 spawn = app_hub.spawn
 
 DEFALUT_ASYNC_UTILITY_EXE_TIMEOUT = 60 # 60 sec
 CHECK_EVENT_DEFAULT_TIMEOUT = 0
 
-__default_event_id__ = list(map(lambda x: x.value, AsyncUtilityEventID._member_map_.values()))
+__default_event_id__ = list(map(lambda x: x.value, AsyncServiceEventID._member_map_.values()))
 
 class EventNotExist(Exception):
     pass
@@ -52,7 +52,7 @@ def check_event(event_id, set_or_not: bool, timeout=0):
         return _check_event
     return _decorator
 
-class AsyncUtility(ABC):
+class AsyncService(ABC):
     def __init__(self, log=None, events_id=None, exe_timeout=DEFALUT_ASYNC_UTILITY_EXE_TIMEOUT) -> None:
         events_id = events_id or __default_event_id__
 
@@ -116,25 +116,25 @@ class AsyncUtility(ABC):
     async def start(self):
         pass
 
-    @check_event(AsyncUtilityEventID.stop.value, False)
+    @check_event(AsyncServiceEventID.stop.value, False)
     async def stop(self):
         self._cancel_execute()
-        await self._wait_event(AsyncUtilityEventID.stop.value)
+        await self._wait_event(AsyncServiceEventID.stop.value)
         self._check_exception()
 
     async def wait_finished(self, timeout=0):
         try:
-            await self._wait_event(AsyncUtilityEventID.finish.value, timeout)
+            await self._wait_event(AsyncServiceEventID.finish.value, timeout)
         except asyncio.TimeoutError:
             raise UtilityStillRunning()
 
     async def is_running(self):
-        return self._check_event_is_set(AsyncUtilityEventID.running.value) and \
-            not self._check_event_is_set(AsyncUtilityEventID.stop.value)
+        return self._check_event_is_set(AsyncServiceEventID.running.value) and \
+            not self._check_event_is_set(AsyncServiceEventID.stop.value)
 
     def is_running_no_await(self):
-        return self._check_event_is_set(AsyncUtilityEventID.running.value) and \
-            not self._check_event_is_set(AsyncUtilityEventID.stop.value)
+        return self._check_event_is_set(AsyncServiceEventID.running.value) and \
+            not self._check_event_is_set(AsyncServiceEventID.stop.value)
 
     async def __aenter__(self):
         return self

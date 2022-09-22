@@ -5,7 +5,7 @@ from types import MethodType
 from async_app_fw.controller.mcp_controller.master_lib.event import ReqGetAgentConnection
 from async_app_fw.base.app_manager import BaseApp
 from async_app_fw.lib.hub import app_hub
-from custom_app.util.constant import AsyncUtilityEventID
+from custom_app.util.constant import AsyncServiceEventID
 from custom_app.util.async_tshark import AsyncCaptureService
 from custom_app.util.async_pyshark_lib.capture.async_capture import AsyncCaptureStop, DEFAULT_PACKET_CAPTURE_SIZE
 from .event import EventRemoteExecute, EventRemoteCancelExecute
@@ -77,7 +77,7 @@ async def remote_execute(app: BaseApp, capture: AsyncCaptureService, args, kwarg
     capture._capture = fake_capture
 
     app.send_event_to_self(EventRemoteExecute(capture, args, kwargs))
-    await capture._wait_event(AsyncUtilityEventID.stop.value, timeout=None)
+    await capture._wait_event(AsyncServiceEventID.stop.value, timeout=None)
     fake_capture.close()
 
     # clean instance of capture and mcp_connection.
