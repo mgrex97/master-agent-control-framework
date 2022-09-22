@@ -135,3 +135,16 @@ class AsyncUtility(ABC):
     def is_running_no_await(self):
         return self._check_event_is_set(AsyncUtilityEventID.running.value) and \
             not self._check_event_is_set(AsyncUtilityEventID.stop.value)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, value, tarceback):
+        if self.is_running_no_await():
+            return
+        self._log.info(f'Wait Service stop.')
+        try:
+            await self.stop()
+        except Exception as e:
+            pass
+        self._log.info(f'Service stopped.')
