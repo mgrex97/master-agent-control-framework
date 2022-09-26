@@ -92,7 +92,7 @@ class CaptureServiceMasterHandler(BaseApp):
             capture._cancel_execute()
             return
 
-        msg = conn.mcproto_parser.CaptureServiceCancelExecute(capture._capture_id)
+        msg = conn.mcproto_parser.CaptureServiceCancelExecute(conn, capture._capture_id)
         conn.send_msg(msg)
 
     @observe_event(mcp_event.EventCaptureServiceSendPKT)
