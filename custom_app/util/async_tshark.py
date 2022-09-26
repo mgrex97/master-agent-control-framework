@@ -5,7 +5,7 @@ from asyncio import CancelledError, TimeoutError as asyncTimeoutError
 
 
 from .async_pyshark_lib.capture.async_live_capture import AsyncLiveCapture as _AsyncLiveCapture
-from .async_pyshark_lib.capture.async_capture import AsyncCapture as _AsyncCapture
+from .async_pyshark_lib.capture.async_capture import AsyncCapture as _AsyncCapture, AsyncCaptureStop
 from .async_utility import AsyncService, check_event
 from .constant import AsyncServiceEventID as EventID
 
