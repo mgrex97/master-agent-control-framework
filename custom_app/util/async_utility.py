@@ -140,7 +140,7 @@ class AsyncService(ABC):
         return self
 
     async def __aexit__(self, exc_type, value, tarceback):
-        if self.is_running_no_await():
+        if not self.is_running_no_await():
             return
         self._log.info(f'Wait Service stop.')
         try:
